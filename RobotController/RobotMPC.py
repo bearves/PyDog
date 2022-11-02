@@ -8,24 +8,27 @@ class QuadConvexMPC(object):
     """
         Quadruped robot model predictive controller
     """
+    # MPC settings
+    leap: int = 25                 # Solve MPC every (leap) simulating step
+    dt: float = 1/1000.            # time step of the simulator
+    dt_mpc: float = 1/1000. * leap # MPC solving time interval
+    horizon_length: int = 20       # prediction horizon length of MPC
 
-    leap: int = 25
-    dt: float = 1/1000.
-    dt_mpc: float = 1/1000. * leap
-    horizon_length: int = 20
-
+    # System config
     n_leg: int = 4
-    dim_s: int = 13
-    dim_u: int = n_leg * 3
+    dim_s: int = 13                # dimension of system states
+    dim_u: int = n_leg * 3         # dimension of system inputs
 
-    Ib : np.ndarray = np.diag([0.07, 0.26, 0.242]) # mass inertia of simplified body
+    # Dynamic constants
+    Ib : np.ndarray = np.diag([0.07, 0.26, 0.242]) # mass inertia of floating base
     invIb : np.ndarray = np.eye(3)
-    mb : float = 10 # mass of the simplified body
-    ground_fric : float = 0.4
-    fz_min : float = 0.1
-    fz_max : float = 150
+    mb : float = 10                                # mass of the floating base
+    ground_fric : float = 0.4                      # ground Coulomb friction constant
+    fz_min : float = 0.1                           # minimum vertical force for supporting leg
+    fz_max : float = 150                           # maximum vertical force for supporting leg
 
-    Qk = np.diag([100,100,100,1,1,100,1,1,1,1,1,1,0])
+    # MPC weights
+    Qk = np.diag([100,100,100,1,1,100,1,1,1,1,1,1,0]) 
     Rk = 1e-6 * np.eye(dim_u)
 
     # MPC matrix lists
@@ -38,9 +41,10 @@ class QuadConvexMPC(object):
     n_support_list : np.ndarray = np.zeros(horizon_length, dtype=int)
     n_swing_list : np.ndarray = np.zeros(horizon_length, dtype=int)
 
-    x0 : np.ndarray = np.zeros(dim_s)
-    x_ref_seq : np.ndarray = np.zeros((horizon_length, dim_s))
-    X_ref : np.ndarray = np.zeros(horizon_length * dim_s)
+    # system ref states and actual states
+    x0 : np.ndarray = np.zeros(dim_s)  # current state
+    x_ref_seq : np.ndarray = np.zeros((horizon_length, dim_s)) # future reference states
+    X_ref : np.ndarray = np.zeros(horizon_length * dim_s)      # flattened future reference states
 
     # MPC super matrices
     Abar : np.ndarray = np.zeros((horizon_length*dim_s, dim_s))
@@ -80,6 +84,7 @@ class QuadConvexMPC(object):
             self.Qbar[0 + cr * dim_s:dim_s + cr * dim_s, 0 + cr * dim_s:dim_s + cr * dim_s] = self.Qk
             self.Rbar[0 + cr * dim_u:dim_u + cr * dim_u, 0 + cr * dim_u:dim_u + cr * dim_u] = self.Rk
 
+
     def need_solve(self, count: int) -> bool:
         """
             Check whether the mpc need to be solved at this time count.
@@ -88,11 +93,12 @@ class QuadConvexMPC(object):
                 count (int): step counter of the simulator
 
             Returns:
-                solve_flag (bool): a flag indicting whether mpc should be
+                solve_flag (bool): a flag indicting whether MPC should be
                                    solved at this time count
         """
         solve_flag = count % self.leap == 0
         return solve_flag
+
 
     def update_mpc_matrices(self,
                             body_euler_seq : np.ndarray,
@@ -104,6 +110,7 @@ class QuadConvexMPC(object):
             Update time variant matrices Ak, Bk, Ck, ck, Dk, dk for each time
             moment in the prediction horizon.
             At each time moment, the system dynamics can be written as
+
                 x_{k+1} = Ak xk + Bk uk
                 s.t.
                     Ck uk < ck
@@ -142,6 +149,7 @@ class QuadConvexMPC(object):
             self.dk_list[i, 0:3*n_swing, 0] = dk
             self.n_support_list[i] = n_support
             self.n_swing_list[i] = n_swing
+
 
     def update_super_matrices(self):
         """
@@ -206,7 +214,11 @@ class QuadConvexMPC(object):
         self.H = self.Rbar + self.Bbar.T @ self.Qbar @ self.Bbar
         self.G = (self.Abar @ self.x0 - self.X_ref).T @ self.Qbar @ self.Bbar
 
-    def cal_state_equation(self, body_pos: np.ndarray, body_euler: np.ndarray, r_leg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+
+    def cal_state_equation(self,    
+                           body_pos: np.ndarray, 
+                           body_euler: np.ndarray, 
+                           r_leg: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
             Calculate the state matrix A and input matrix B of
             the continuous system dynamics, i.e.
@@ -254,6 +266,7 @@ class QuadConvexMPC(object):
             B[9:12,0+i*3:3+i*3] = (1./self.mb) * np.eye(3)
 
         return A, B
+
 
     def discretize_state_equation(self, A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -339,7 +352,7 @@ class QuadConvexMPC(object):
             forces of swing legs to be zero,
                                 D f = rhs
             where f in R(3*n_leg x 1) is the leg tip force in WCS of this moment,
-                  D in R(3*n_swing x 3*nleg) is the constraint matrix,
+                  D in R(3*n_swing x 3*n_leg) is the constraint matrix,
                   rhs = 0 in R(3*n_swing x 1) is the RHS of the constraint.
 
             Parameters:

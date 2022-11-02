@@ -6,40 +6,46 @@ import qpsolvers
 
 class QuadSingleBodyWBC(object):
     """
-        Quadruped robot whole body controller based on single body dynamic
+        Quadruped robot whole body controller (PID) based on single floating base dynamic.
     """
 
-    leap: int = 25
-    dt: float = 1/1000.
-    dt_wbc: float = 1/1000. * leap
+    # WBC settings
+    leap: int = 25                  # Solve WBC every (leap) simulating step
+    dt: float = 1/1000.             # time step of the simulator
+    dt_wbc: float = 1/1000. * leap  # WBC solving time interval
 
+    # System config
     n_leg: int = 4
-    dim_s: int = 12
-    dim_u: int = n_leg * 3
+    dim_s: int = 12                 # dimension of system states
+    dim_u: int = n_leg * 3          # dimension of system inputs
 
-    Ib : np.ndarray = np.diag([0.07, 0.26, 0.242])*0.8 # mass inertia of simplified body
+    # Dynamic constants
+    Ib : np.ndarray = np.diag([0.07, 0.26, 0.242])*0.8 # mass inertia of floating base
     invIb : np.ndarray = np.eye(3)
-    mb : float = 10 # mass of the simplified body
-    ground_fric : float = 0.4
-    fz_min : float = 0.1
-    fz_max : float = 150
+    mb : float = 10                                    # mass of the floating base
+    ground_fric : float = 0.4                          # ground Coulomb friction constant
+    fz_min : float = 0.1                               # minimum vertical force for supporting leg
+    fz_max : float = 150                               # maximum vertical force for supporting leg
 
+    # WBC weights
     Qk = np.array([1000,1000,0,0,0,100,1,1,1,1,1,1])
     kpf = Qk[3:6]
     kdf = Qk[9:12]
     kpt = Qk[0:3]
     kdt = Qk[6:9]
 
-    x0 : np.ndarray = np.zeros(dim_s)
-    x_ref : np.ndarray = np.zeros(dim_s)
+    # system ref states and actual states
+    x0 : np.ndarray = np.zeros(dim_s) # current state
+    x_ref : np.ndarray = np.zeros(dim_s) # reference states
 
+    # WBC holders
     H : np.ndarray = np.zeros((dim_u, dim_u))
     G : np.ndarray = np.zeros(dim_u)
     C : np.ndarray = np.zeros((6, ))
 
     def __init__(self, sim_dt: float):
         """
-            Create a whole body controller based on single body dynamic for quadruped robot.
+            Create a whole body controller based on single floating base dynamic for quadruped robot.
 
             Parameters:
                 sim_dt (float): time step of the simulator
@@ -71,7 +77,63 @@ class QuadSingleBodyWBC(object):
                             x0 : np.ndarray,
                             x_ref : np.ndarray):
         """
+            Update matrices H, G, C, c, D, d for solve floating base PID control problem.
 
+            For floating base system, its dynamics can be written as
+
+                            m * vdot = m * g + sum(f_i)
+                            J * wdot + w x Jw = sum (r_leg_i x f_i)
+            
+            where 
+                            m is the body mass, 
+                            J is the body inertia in WCS, 
+                            r_leg is the leg tip position minus body position in WCS
+                            f     is the leg tip force in WCS
+                            g is the gravitational acceleration
+                            w is the angular velocity of the body,
+                            vdot is the linear acceleration of the body,
+                            wdot is the angular acceleration of the body
+
+            Simplify and neglect w x Jw, we have 
+
+                            [I   I   I   I;           [m * (vdot - g);
+                            r1^ r2^ r3^ r4^] * f    =  J * wdot]                    (Eq.1)
+
+            Here, hat(^) is the matrix form of cross product. Eq.1 can be rewritten as
+                                            A * f - b = 0,
+            where
+                                    A = [I   I   I   I; 
+                                        r1^ r2^ r3^ r4^],
+                                    b = [m * (vdot - g);
+                                         J * wdot]
+
+            First a PD control law is formulated to get expect vdot and wdot
+
+                            vdot_ext = kpf * (pos_ref - pos_act) + kdf * (vel_ref - vel_act)
+                            wdot_ext = kpt * (rpy_ref - rpy_act) + kdt * (angvel_ref -angvel_act)
+
+            Then, a QP problem can be formulated as
+
+                            min (A*f - b).T Q (A*f - b) + f.T * (R.T * R) * f
+                            s.t.
+                                    for swinging legs,
+                                            f_i = 0 
+                                    for supporting legs,
+                                        f_i_x, f_i_y < mu f_i_z;
+                                        fz_min < f_i_z < fz_max
+            
+            And it can be rewritten in the standard QP form as
+                            min 1/2 * f.T * H * f + G.T * f
+                            s.t.
+                                    D f = d
+                                    C f < c
+            
+            Parameters:
+                body_orn (array(4)): current actual body orientation in quaternion.
+                r_leg (array(n_leg * 3)): current leg tip position in WCS.
+                support_state (array(n_leg)): current leg support state.
+                x0 (array(dim_s)): current robot state.
+                x_ref (array(dim_s)): reference robot state.
         """
 
         self.x0 = x0.copy()
@@ -85,7 +147,7 @@ class QuadSingleBodyWBC(object):
         wdot_ext = self.kpt * self.x_err[0:3] + self.kdt * self.x_err[6:9]
         
         b = np.zeros(6)
-        b[0:3] = self.mb * (vdot_ext + np.array([0.38, 0, 9.81]))
+        b[0:3] = self.mb * (vdot_ext + np.array([0.38, 0, 9.81])) 
         b[3:6] = Iw @ wdot_ext
 
         A = np.zeros((6, self.dim_u))
@@ -159,6 +221,7 @@ class QuadSingleBodyWBC(object):
                 cnt = cnt+1
         return C, rhs, int(n_support)
 
+
     def cal_swing_force_constraints(self, support_state : np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
         """
             Generate equality constraints for this moment to restrict the 
@@ -204,11 +267,11 @@ class QuadSingleBodyWBC(object):
 
     def solve(self) -> np.ndarray:
         """
-            Solve MPC problem for quadruped robot, must be called after all
+            Solve WBC problem for quadruped robot, must be called after all
             matrices have been updated. 
 
             Returns:
-                u_mpc(array(n_leg*3, horizon_length)) :
+                u_mpc(array(n_leg*3)) :
                     predicted optimal input of the system, i.e. the leg tip force in WCS.
         """
         #print(self.H)

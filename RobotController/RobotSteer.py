@@ -2,18 +2,29 @@ import numpy as np
 from scipy.spatial.transform import Rotation as rot
 
 class RobotSteer(object):
+    """
+        Robot steering controller.
+        It converts steering commands to robot body reference velocity in WCS.
+    """
 
-    # direction : forward, backward, move left, move right, turn left, turn right
-    direction_flag = [0, 0, 0, 0, 0, 0]
-    df_2_vc_index = [0, 0, 1, 1, 2, 2]
-    df_2_vc_action = [1, -1, 1, -1, 1, -1]
+    # direction definitions: forward, backward, move left, move right, turn left, turn right
+    # a flag indicating whether a direction is commanded
+    direction_flag: list[int]   = [0, 0, 0, 0, 0, 0]    
+    # the index of the value in the vel_cmd array on which a direction flag affects 
+    df_2_vc_index:  list[int]   = [0, 0, 1, 1, 2, 2]     
+    # the action of the value in the vel_cmd array on which a direction flag affects 
+    # 1 means positive increasing, -1 means negtive increasing
+    df_2_vc_action: list[float] = [1, -1, 1, -1, 1, -1] 
 
-    max_vel_cmd = np.array([1.5, 0.4, 3])
-    vel_cmd_local = np.zeros(3)
-    vel_cmd_local_filtered = np.zeros(3)
-    vel_cmd_wcs = np.zeros(3)
+    max_vel_cmd:            np.ndarray = np.array([1.5, 0.4, 3])
+    vel_cmd_local:          np.ndarray = np.zeros(3)
+    vel_cmd_local_filtered: np.ndarray = np.zeros(3)
+    vel_cmd_wcs:            np.ndarray = np.zeros(3)
     
     def __init__(self) -> None:
+        """
+            Create a robot steer instance.
+        """
         pass
 
     def reset_vel_cmd(self):
@@ -42,7 +53,7 @@ class RobotSteer(object):
     def set_turn_right(self):
         self.direction_flag[5] = 1
     
-    def update_vel_cmd(self, body_orn):
+    def update_vel_cmd(self, body_orn: np.ndarray):
         
         # update vel cmd
         for df in range(6):
@@ -64,6 +75,7 @@ class RobotSteer(object):
         self.vel_cmd_wcs[0:2] = Rz @ self.vel_cmd_local_filtered[0:2]
         self.vel_cmd_wcs[2] = self.vel_cmd_local_filtered[2]
 
-    def get_vel_cmd_wcs(self):
+
+    def get_vel_cmd_wcs(self) -> np.ndarray:
         return self.vel_cmd_wcs
 

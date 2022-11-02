@@ -10,18 +10,25 @@ class QuadWBIC(object):
         Quadruped robot whole body impluse controller
     """
 
+    # System constants
     n_leg: int = 4
-    nv: int = 6 + n_leg * 3 # dynamic model generized velocity dimension
-    ground_fric: float = 0.4
-    fz_min : float = 0.15
-    fz_max : float = 150
+    nv: int = 6 + n_leg * 3   # dynamic model generized velocity dimension
+    ground_fric: float = 0.4  # round Coulomb friction constant
+    fz_min : float = 0.15     # minimum vertical force for supporting leg
+    fz_max : float = 150      # maximum vertical force for supporting leg
 
+    # Selecting matrix of the floating base dynamics
     # Sf selects first 6 rows, which is the floating base dynamics
     Sf : np.ndarray = np.zeros((6, nv))
-    # cost matrix
+
+    # Weight matrix
     Q : np.ndarray = None
 
-    def __init__(self) -> None:        
+
+    def __init__(self) -> None:
+        """
+            Create a whole body impluse controller
+        """
         self.Sf = np.zeros((6, self.nv))
         self.Sf[0:6, 0:6] = np.eye(6)
 

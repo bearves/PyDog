@@ -31,33 +31,36 @@ class RobotDynamicModel(object):
 
     # constants
     n_leg: int = 4
-    nq: int = 7 + 3*n_leg
-    nv: int = 6 + 3*n_leg
-    support_thres: float = 0.8
+    nq: int = 7 + 3*n_leg       # dimension of generized coordinates
+    nv: int = 6 + 3*n_leg       # dimension of generized velocity
+    support_thres: float = 0.8  # threshold to determine whether a foot is supporting or not
 
     # pinocchio model instance
     robot: pin.RobotWrapper | None = None
 
     # states
-    q: np.ndarray = np.zeros(nq)
-    v: np.ndarray = np.zeros(nv)
-    body_R: np.ndarray = np.eye(3)
-    support_state: np.ndarray = np.zeros(n_leg)
+    q: np.ndarray = np.zeros(nq)                    # generized coordinates
+    v: np.ndarray = np.zeros(nv)                    # generized velocity
+    body_R: np.ndarray = np.eye(3)                  # body rotational matrix
+    support_state: np.ndarray = np.zeros(n_leg)     # support states of all legs
 
     # data holders
-    J_leg: np.ndarray = np.zeros((n_leg, 3, nv))
-    M : np.ndarray = np.zeros((nv, nv))
-    g : np.ndarray = np.zeros(nv)
-    C : np.ndarray = np.zeros((nv, nv))
+    J_leg: np.ndarray = np.zeros((n_leg, 3, nv))    # Jacobian of leg tip position
+    M : np.ndarray = np.zeros((nv, nv))             # Mass matrix
+    g : np.ndarray = np.zeros(nv)                   # gravity term
+    C : np.ndarray = np.zeros((nv, nv))             # Coriolis matrix
 
     # frame and joint id params, these params should be adjusted according to the URDF file
-    body_frame_id: int = 1
-    root_joint_id: int = 1
+    body_frame_id: int = 1                           # frame id of body
+    root_joint_id: int = 1                           # joint id of root
     # FL, FR, RL, RR, used inside pinocchio
-    toe_frame_id_lists: list[int] = [11, 21, 31, 41]
+    toe_frame_id_lists: list[int] = [11, 21, 31, 41] # frame id of toe link
 
 
     def __init__(self) -> None:
+        """
+            Create a robot dynamic model.
+        """
         self.q[3:7] = np.array([0, 0, 0, 1])  # unit quaternion
 
 
