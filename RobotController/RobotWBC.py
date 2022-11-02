@@ -165,7 +165,7 @@ class QuadSingleBodyWBC(object):
             forces of swing legs to be zero,
                                 D f = rhs
             where f in R(3*n_leg x 1) is the leg tip force in WCS of this moment,
-                  D in R(3*n_swing x 3*nleg) is the constraint matrix,
+                  D in R(3*n_swing x 3*n_leg) is the constraint matrix,
                   rhs = 0 in R(3*n_swing x 1) is the RHS of the constraint.
 
             Parameters:

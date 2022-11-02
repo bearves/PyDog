@@ -5,8 +5,7 @@ from scipy.spatial.transform import Rotation as rot
 
 class BodyTrjPlanner(object):
     """
-        Body com trajectory planner.
-        TODO: predict trajectory based on joystick command
+        Body center trajectory planner.
     """
 
     ref_body_pos = np.zeros(3)

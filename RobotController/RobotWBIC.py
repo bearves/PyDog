@@ -6,9 +6,12 @@ import RobotController.RobotTask as rtask
 
 
 class QuadWBIC(object):
+    """
+        Quadruped robot whole body impluse controller
+    """
 
-    n_legs: int = 4
-    nv: int = 6 + n_legs * 3 # dynamic model generized velocity dimension
+    n_leg: int = 4
+    nv: int = 6 + n_leg * 3 # dynamic model generized velocity dimension
     ground_fric: float = 0.4
     fz_min : float = 0.15
     fz_max : float = 150
@@ -48,7 +51,7 @@ class QuadWBIC(object):
                 tau (array(n_leg * 3)): Joint target torque.
         """
         
-        nj = self.n_legs * 3
+        nj = self.n_leg * 3
         # update tasks
         task_list = self.update_task(dyn_model, ref_x_wcs, ref_xdot_wcs, ref_xddot_wcs)
 
@@ -92,7 +95,7 @@ class QuadWBIC(object):
         task_list.append(rtask.BodyPosTask())
 
         # add swing leg tip task
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             if not dyn_model.is_leg_supporting(leg):
                 task_list.append(rtask.TipPosTask(leg))
         
@@ -283,7 +286,7 @@ class QuadWBIC(object):
             # select supporting leg's fr_mpc for optimization
             fr_mpc_support = np.zeros(nsp * 3)
             cnt = 0
-            for leg in range(self.n_legs):
+            for leg in range(self.n_leg):
                 if dyn_model.is_leg_supporting(leg):
                     fr_mpc_support[cnt*3:3+cnt*3] = fr_mpc[leg*3:3+leg*3]
                     cnt += 1
@@ -336,7 +339,7 @@ class QuadWBIC(object):
 
         if nsp > 0:
             cnt = 0
-            for leg in range(self.n_legs):
+            for leg in range(self.n_leg):
                 if dyn_model.is_leg_supporting(leg):
                     self.C[0+cnt*6:6+cnt*6, 6+cnt*3:6+3+cnt*3] = U_support
                     self.c[0+cnt*6:6+cnt*6] = u_support - U_support @ fr_mpc[0+leg*3:3+leg*3]
@@ -368,7 +371,7 @@ class QuadWBIC(object):
         # add dfr back to fr
         self.fr_result = fr_mpc.copy()
         cnt = 0
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             if dyn_model.is_leg_supporting(leg):
                 self.fr_result[0+leg*3:3+leg*3] += self.dfr_result[0+cnt*3:3+cnt*3]
                 cnt += 1
@@ -390,7 +393,7 @@ class QuadWBIC(object):
                 dyn_model (RobotDynamicModel reference): Robot dynamic model. Updated already.
         """
         self.tau_result = dyn_model.get_tau(self.qddot_result, self.fr_result)
-        self.tau_joint_result = self.tau_result[6:6+self.n_legs*3]
+        self.tau_joint_result = self.tau_result[6:6+self.n_leg*3]
         return self.tau_joint_result
 
     

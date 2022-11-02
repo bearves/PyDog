@@ -8,9 +8,9 @@ class WBCTask(object):
         Base class of WBC tasks.
     """
 
-    n_legs: int = 4  # number of legs
+    n_leg: int = 4  # number of legs
     nt: int = 1  # dimension of task configuration
-    nv: int = 6 + n_legs * 3  # dimension of model's qdot
+    nv: int = 6 + n_leg * 3  # dimension of model's qdot
     Jt: np.ndarray = np.zeros((nt, nv))
     Jtdqd: np.ndarray = np.zeros(nt)
     pos_err: np.ndarray = np.zeros(nt)

@@ -8,7 +8,7 @@ class RobotKineticModel(object):
     LID = {'FR' : 0, 'FL' : 1, 'RR' : 2, 'RL' : 3}
 
     # robot physical parameters
-    NLEG = 4    # number of legs
+    n_leg = 4    # number of legs
     HBL = 0.183 # half body length
     HBW = 0.047 # half body width
     HO  = 0.08505 # hip offset
@@ -17,28 +17,28 @@ class RobotKineticModel(object):
     #COM_OFFSET = np.array([0.012731, 0.002186, 0.000515]) # offset of the body's COM to its origin in the URDF
     COM_OFFSET = np.zeros(3)
 
-    hip_pos_ = np.zeros(3 * NLEG)
-    hip_R_ = np.zeros((NLEG, 3, 3))
+    hip_pos_ = np.zeros(3 * n_leg)
+    hip_R_ = np.zeros((n_leg, 3, 3))
 
     # robot state in wcs
     body_pos_ = np.zeros(3)
     body_vel_ = np.zeros(3)
     body_orn_ = np.array([0, 0, 0, 1])
     body_angvel_ = np.zeros(3)
-    jnt_pos_ = np.zeros(3 * NLEG)
-    jnt_vel_ = np.zeros(3 * NLEG)
+    jnt_pos_ = np.zeros(3 * n_leg)
+    jnt_vel_ = np.zeros(3 * n_leg)
 
     body_R_ = np.eye(3)
     body_euler_ = np.zeros(3)
 
-    tip_pos_hip_ = np.zeros(3 * NLEG)
-    tip_vel_hip_ = np.zeros(3 * NLEG)
-    tip_pos_body_ = np.zeros(3 * NLEG)
-    tip_vel_body_ = np.zeros(3 * NLEG)
-    tip_pos_world_ = np.zeros(3 * NLEG)
-    tip_vel_world_ = np.zeros(3 * NLEG)
+    tip_pos_hip_ = np.zeros(3 * n_leg)
+    tip_vel_hip_ = np.zeros(3 * n_leg)
+    tip_pos_body_ = np.zeros(3 * n_leg)
+    tip_vel_body_ = np.zeros(3 * n_leg)
+    tip_pos_world_ = np.zeros(3 * n_leg)
+    tip_vel_world_ = np.zeros(3 * n_leg)
 
-    leg_jac = np.zeros((NLEG, 3, 3))
+    leg_jac = np.zeros((n_leg, 3, 3))
 
     def __init__(self):
         HBL = self.HBL
@@ -71,7 +71,7 @@ class RobotKineticModel(object):
         self.body_euler_ = Rot.from_quat(body_orn).as_euler('ZYX')
 
         # update leg forward kinetics
-        for i in range(self.NLEG):
+        for i in range(self.n_leg):
             idx = range(0+i*3, 3+i*3)
             self.tip_pos_hip_[idx], self.tip_vel_hip_[idx], self.leg_jac[i, :, :], _ \
                 = self.leg_fk(i, jnt_actpos[idx], jnt_actvel[idx])
@@ -91,7 +91,7 @@ class RobotKineticModel(object):
                          [ rz,   0, -rx],
                          [-ry,  rx,   0]])
         jleg = self.body_R_ @ self.hip_R_[leg_id,:,:] @ self.leg_jac[leg_id,:,:]
-        jc = np.zeros((3, 6 + self.NLEG * 3))
+        jc = np.zeros((3, 6 + self.n_leg * 3))
 
         # convert to body cs, as the same to the definitions used in Pinocchio and MIT codes
         jc[0:3,0:3] = np.eye(3) @ self.body_R_
@@ -102,14 +102,14 @@ class RobotKineticModel(object):
     
     def whole_body_ik(self, tip_pos_world, tip_vel_world):
 
-        tip_pos_body = np.zeros(3 * self.NLEG)
-        tip_pos_hip  = np.zeros(3 * self.NLEG)
-        tip_vel_body = np.zeros(3 * self.NLEG)
-        tip_vel_hip  = np.zeros(3 * self.NLEG)
-        jnt_pos = np.zeros(3 * self.NLEG)
-        jnt_vel = np.zeros(3 * self.NLEG)
+        tip_pos_body = np.zeros(3 * self.n_leg)
+        tip_pos_hip  = np.zeros(3 * self.n_leg)
+        tip_vel_body = np.zeros(3 * self.n_leg)
+        tip_vel_hip  = np.zeros(3 * self.n_leg)
+        jnt_pos = np.zeros(3 * self.n_leg)
+        jnt_vel = np.zeros(3 * self.n_leg)
 
-        for i in range(self.NLEG):
+        for i in range(self.n_leg):
             idx = range(0+i*3, 3+i*3)
             tip_pos_body[idx] = self.body_R_.T @ (tip_pos_world[idx] - self.body_pos_)
             tip_vel_body[idx] = self.body_R_.T @ (tip_vel_world[idx] +
@@ -210,13 +210,13 @@ class RobotKineticModel(object):
 
     def get_hip_pos_body_with_offset(self):
         hip_pos_offset = self.hip_pos_.copy()
-        for i in range(self.NLEG):
+        for i in range(self.n_leg):
             hip_pos_offset[1+i*3] += -self.HO * self.leg_sym_flag_[i]
         return hip_pos_offset
 
     def get_joint_trq(self, tip_force_wcs):
         tau = np.zeros(12)
-        for i in range(self.NLEG):
+        for i in range(self.n_leg):
             tip_force_body = self.body_R_.T @ tip_force_wcs[0+i*3:3+i*3]
             tip_force_hip = self.hip_R_[i, :, :] @ tip_force_body
             tau[0+i*3:3+i*3] = self.leg_jac[i, :, :].T @ tip_force_hip

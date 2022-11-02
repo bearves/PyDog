@@ -1,13 +1,13 @@
 # A python version of quadruped robot gait controller
 
-This project is a personal project. Its purpose is to learn the most important ideas of the MIT cheetah controller, and reimplement it by myself. 
-This project is a simplified python implementation for quadruped robot simulation, based on MIT's open-sourced cheetah 3 locomotion controller and related papers. This project is not intend to realizing a novel or full-capable locomotion control for challenging terrains and motion abilities. These can be extend, but here it remains simple just to reveal the core idea of MIT's controller:
+This project is a personal project. Its purpose is to learn the most important ideas of the MIT cheetah controller, and reimplement them by myself. 
+This project is a simplified python implementation for quadruped robot simulation, based on MIT's open-sourced cheetah 3 locomotion controller and related papers. This project is neither intend to realizing a novel or full-capable locomotion control for challenging terrains and motion abilities, nor to achieving best computational performance. These features can be extended in the future, but this implementation is written in a simple and comprehensive way just to reveal the core idea of the MIT's controllers, including 
 
-    - Convex model predictive controller for floating base. 
-    - Simple PID controller for floating base. 
+    - Convex model predictive controller (MPC) for floating base. 
+    - Simple PD controller for floating base. 
     - Whole body impluse controller(WBIC). 
     - Foothold calculation based on Raibert's Law.
-    - Gait schedular and body and leg trajectory planning.
+    - Gait scheduler and body/leg trajectory planning.
 
 ## Dependencies:
     - Python 3.9+

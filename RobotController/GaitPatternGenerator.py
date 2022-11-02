@@ -3,20 +3,23 @@ import math
 
 
 class GaitPatternGenerator(object):
+    """
+        Gait pattern generator to generate swing and stance sequences, aka. support state, for each legs.
+    """
     
     n_leg: int = 4
     gait_name: str = "Stand"
-    total_period: float = 0.5
-    offset: np.ndarray = np.array([0, 0, 0, 0])
-    duty: np.ndarray   = np.array([1, 1, 1, 1])
+    total_period: float = 0.5                    # gait period of a whole step
+    offset: np.ndarray = np.array([0, 0, 0, 0])  # offset ratio of the touch down time in a step
+    duty: np.ndarray   = np.array([1, 1, 1, 1])  # ratio of the supporting time in a step
 
-    time: float = 0
-    start_time: float = 0
-    net_time: float = 0
-    cycles: int = 0
-    total_phase: float = 0
+    time: float = 0        # current absolute time
+    start_time: float = 0  # time point to start planning
+    net_time: float = 0    # abs_time - start_time
+    cycles: int = 0        # number of steps for the whole robot
+    total_phase: float = 0 # phase in a step of the whole robot
     
-    phase: np.ndarray = np.zeros(4)
+    phase: np.ndarray = np.zeros(4) # phase for each leg
 
     def __init__(self, name: str, total_peroid: float, offset: np.ndarray, duty: np.ndarray) -> None:
         self.gait_name = name
@@ -30,10 +33,22 @@ class GaitPatternGenerator(object):
 
 
     def set_start_time(self, time_now: float):
+        """
+            Set the start time point for the generator to plan the swing/stance sequence.
+
+            Parameters:
+                time_now (float) : current absolute time.
+        """
         self.start_time = time_now
 
 
     def set_current_time(self, time_now: float):
+        """
+            Set the current time of the gait pattern generator, and update gait phases for each leg.
+
+            Parameters:
+                time_now (float) : current absolute time.
+        """
         self.time = time_now
         self.net_time = self.time - self.start_time
         self.total_phase, self.cycles = math.modf(self.net_time/self.total_period)
@@ -44,6 +59,12 @@ class GaitPatternGenerator(object):
 
     
     def get_current_support_state(self) -> np.ndarray:
+        """
+            Obtain the support state at current time.
+
+            Returns:
+                support_state (array(n_leg)) : current support state of each leg, stance = 1, swing = 0.
+        """
         support_state = np.zeros(4)
         for i in range(self.n_leg):
             if self.phase[i] < self.duty[i]:
@@ -54,6 +75,17 @@ class GaitPatternGenerator(object):
         
 
     def predict_mpc_support_state(self, horizon_length: int, dt_mpc: float) -> np.ndarray:
+        """
+            Obtain the support state sequence within the prediction horizon.
+
+            Parameters:
+                horizon_length (int) : length of the MPC horizon, i.e. the prediction steps ahead current time.
+                dt_mpc        (float): the time interval of a prediction step in MPC.
+            
+            Returns:
+                mpc_support_state (array(horizon_length, n_leg)): 
+                    the support state sequence within the prediction horizon.
+        """
         mpc_support_state = np.zeros((horizon_length, self.n_leg))
         for t in range(horizon_length):
             predict_time = t * dt_mpc + self.time
@@ -68,21 +100,48 @@ class GaitPatternGenerator(object):
                     mpc_support_state[t, i] = 0 # swing
 
         return mpc_support_state
+
     
     def can_switch(self) -> bool:
+        """
+            Indicate whether a step has finished, and the robot can switch to another gait pattern.
+
+            Returns:
+                indicator (bool): can switch = True, cannot switch = False.
+        """
         if math.fabs(self.total_phase) < 1e-6:
             return True
         return False
 
+
     def get_current_swing_time_ratio(self, leg: int) -> tuple[float, float]:
+        """
+            Get the current time ratio and its time derivative in the swing phase for a leg.
+            This is useful for swing leg trajectory planning and the next foothold prediction.
+
+            Parameters:
+                leg (int): the index of the leg.
+
+            Returns:
+                swing_time_ratio (float): time ratio in the swing phase.
+                swing_time_ratio_dot (float): time derivative of the time ratio in the swing phase. 
+        """
         if self.phase[leg] < self.duty[leg]:
             return 0, 0
         else:
             swing_time_ratio = (self.phase[leg] - self.duty[leg])/(1. - self.duty[leg])
             swing_time_ratio_dot = 1/self.total_period/(1. - self.duty[leg])
             return swing_time_ratio, swing_time_ratio_dot
+
     
-    def get_swing_time_left(self):
+    def get_swing_time_left(self) -> np.ndarray:
+        """
+            Get the time left in the swing phase for all legs.
+            This is useful for swing leg trajectory planning and the next foothold prediction.
+
+            Returns:
+                swing_time_left (array(n_leg)): time left in the swing phase for all legs.
+        """
         swing_time_left = np.zeros(self.n_leg)
         for leg in range(self.n_leg):
             if self.phase[leg] < self.duty[leg]: # stance
@@ -94,5 +153,11 @@ class GaitPatternGenerator(object):
         return swing_time_left
 
     
-    def get_stance_duration(self):
+    def get_stance_duration(self) -> float:
+        """
+            Get the time duration of the stance phase.
+
+            Returns:
+                stance_duration (float): time duration of the stance phase.
+        """
         return self.total_period * self.duty
