@@ -1,25 +1,38 @@
 import numpy as np
+from enum import IntEnum
 from scipy.spatial.transform import Rotation as rot
+
+class DirectionFlag(IntEnum):
+    """
+        Definition of the direction flags: 
+        [forward, backward, move left, move right, turn left, turn right]
+    """
+    FORWARD    = 0
+    BACKWARD   = 1
+    MOVE_LEFT  = 2
+    MOVE_RIGHT = 3
+    TURN_LEFT  = 4
+    TURN_RIGHT = 5
+
 
 class RobotSteer(object):
     """
         Robot steering controller.
-        It converts steering commands to robot body reference velocity in WCS.
+        It converts direction flag commands to robot body velocity command in WCS.
     """
-
-    # direction definitions: forward, backward, move left, move right, turn left, turn right
     # a flag indicating whether a direction is commanded
     direction_flag: list[int]   = [0, 0, 0, 0, 0, 0]    
     # the index of the value in the vel_cmd array on which a direction flag affects 
     df_2_vc_index:  list[int]   = [0, 0, 1, 1, 2, 2]     
     # the action of the value in the vel_cmd array on which a direction flag affects 
-    # 1 means positive increasing, -1 means negtive increasing
+    # 1 means positive increasing, -1 means negative increasing
     df_2_vc_action: list[float] = [1, -1, 1, -1, 1, -1] 
 
-    max_vel_cmd:            np.ndarray = np.array([1.5, 0.4, 3])
-    vel_cmd_local:          np.ndarray = np.zeros(3)
-    vel_cmd_local_filtered: np.ndarray = np.zeros(3)
-    vel_cmd_wcs:            np.ndarray = np.zeros(3)
+    # velocity command is defined as [v_x, v_y, thetadot_z], representing a planar movement
+    max_vel_cmd:            np.ndarray = np.array([1.5, 0.4, 3]) # maximum velocity
+    vel_cmd_local:          np.ndarray = np.zeros(3)             # local velocity command
+    vel_cmd_local_filtered: np.ndarray = np.zeros(3)             # filtered local velocity command
+    vel_cmd_wcs:            np.ndarray = np.zeros(3)             # velocity command in WCS
     
     def __init__(self) -> None:
         """
@@ -27,33 +40,64 @@ class RobotSteer(object):
         """
         pass
 
+
     def reset_vel_cmd(self):
+        """
+            Reset current velocity command to zero.
+        """
         self.vel_cmd_local = np.zeros(3)
         self.vel_cmd_local_filtered = np.zeros(3)
         self.vel_cmd_wcs = np.zeros(3)
 
     def clear_direction_flag(self):
+        """
+            Clear all direction flags
+        """
         self.direction_flag = [0, 0, 0, 0, 0, 0]
 
     def set_forward(self):
-        self.direction_flag[0] = 1
+        """
+            Set move forward flag
+        """
+        self.direction_flag[DirectionFlag.FORWARD] = 1
 
     def set_backward(self):
-        self.direction_flag[1] = 1
+        """
+            Set move backward flag
+        """
+        self.direction_flag[DirectionFlag.BACKWARD] = 1
 
     def set_move_left(self):
-        self.direction_flag[2] = 1
+        """
+            Set move left flag
+        """
+        self.direction_flag[DirectionFlag.MOVE_LEFT] = 1
 
     def set_move_right(self):
-        self.direction_flag[3] = 1
+        """
+            Set move right flag
+        """
+        self.direction_flag[DirectionFlag.MOVE_RIGHT] = 1
 
     def set_turn_left(self):
-        self.direction_flag[4] = 1
+        """
+            Set turn left flag
+        """
+        self.direction_flag[DirectionFlag.TURN_LEFT] = 1
 
     def set_turn_right(self):
-        self.direction_flag[5] = 1
+        """
+            Set turn right flag
+        """
+        self.direction_flag[DirectionFlag.TURN_RIGHT] = 1
     
     def update_vel_cmd(self, body_orn: np.ndarray):
+        """
+            Update robot's velocity command according to current direction flag.
+
+            Parameters:
+                body_orn (array(4)): The current body orientation as quaternion in WCS.  
+        """
         
         # update vel cmd
         for df in range(6):
@@ -77,5 +121,11 @@ class RobotSteer(object):
 
 
     def get_vel_cmd_wcs(self) -> np.ndarray:
+        """
+            Get the current body velocity command in WCS.
+
+            Returns:
+                vel_cmd_wcs (array(3)): current body velocity command in WCS.
+        """
         return self.vel_cmd_wcs
 

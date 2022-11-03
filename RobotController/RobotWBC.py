@@ -172,7 +172,7 @@ class QuadSingleBodyWBC(object):
 
     def cal_friction_constraint(self, support_state: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
         """
-            Generate inequality constraints that obay the friction physics
+            Generate inequality constraints that obey the friction physics
             for this moment,
                                 C f < rhs
             where f in R(3*n_leg x 1) is the leg tip force in WCS of this moment,

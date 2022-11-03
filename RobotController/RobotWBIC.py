@@ -7,12 +7,12 @@ import RobotController.RobotTask as rtask
 
 class QuadWBIC(object):
     """
-        Quadruped robot whole body impluse controller
+        Quadruped robot whole body impulse controller
     """
 
     # System constants
     n_leg: int = 4
-    nv: int = 6 + n_leg * 3   # dynamic model generized velocity dimension
+    nv: int = 6 + n_leg * 3   # dynamic model generalized velocity dimension
     ground_fric: float = 0.4  # round Coulomb friction constant
     fz_min : float = 0.15     # minimum vertical force for supporting leg
     fz_max : float = 150      # maximum vertical force for supporting leg
@@ -27,7 +27,7 @@ class QuadWBIC(object):
 
     def __init__(self) -> None:
         """
-            Create a whole body impluse controller
+            Create a whole body impulse controller
         """
         self.Sf = np.zeros((6, self.nv))
         self.Sf[0:6, 0:6] = np.eye(6)
@@ -43,7 +43,7 @@ class QuadWBIC(object):
             Update and run quadruped WBIC algorithm.
             The WBIC algorithm first calculate kinematic WBC to get command dq, qdot, and qddot.
             Then it calls the optimization algorithm according to the MPC outputs to get the final joint torque.
-            The outputs of this algorithm are used for target setting and feedforward setting for lower PD controller.
+            The outputs of this algorithm are used for target setting and feed-forward setting for lower PD controller.
 
             Parameters:
                 dyn_model (RobotDynamicModel reference): Robot dynamic model. Updated already.
@@ -394,7 +394,7 @@ class QuadWBIC(object):
 
                 tau = [tau_f tau_j] = M qddot_result + C + G - Jc.T Fr_result
 
-            Results are stored in self.tau_reslt and self.tau_joint_result.
+            Results are stored in self.tau_result and self.tau_joint_result.
 
             Parameters:
                 dyn_model (RobotDynamicModel reference): Robot dynamic model. Updated already.

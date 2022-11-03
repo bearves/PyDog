@@ -5,13 +5,13 @@ This project is a simplified python implementation for quadruped robot simulatio
 
     - Convex model predictive controller (MPC) for floating base. 
     - Simple PD controller for floating base. 
-    - Whole body impluse controller(WBIC). 
+    - Whole body impulse controller(WBIC). 
     - Foothold calculation based on Raibert's Law.
     - Gait scheduler and body/leg trajectory planning.
 
 ## Dependencies:
     - Python 3.9+
-    - Pinocchio dynamic libary
+    - Pinocchio dynamic library
     - Pybullet simulator
     - Numpy, scipy, matplotlib
     - qpsolvers

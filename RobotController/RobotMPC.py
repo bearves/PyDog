@@ -138,7 +138,7 @@ class QuadConvexMPC(object):
         hz = self.horizon_length
         for i in range(hz):
             A, B = self.cal_state_equation(body_pos, body_euler_seq[i, :], r_leg_seq[i, :])
-            Ak, Bk = self.discretize_state_equation(A, B)
+            Ak, Bk = self.discretized_state_equation(A, B)
             Ck, ck, n_support = self.cal_friction_constraint(support_state_seq[i, :])
             Dk, dk, n_swing = self.cal_swing_force_constraints(support_state_seq[i, :])
             self.Ak_list[i, :, :] = Ak
@@ -268,7 +268,7 @@ class QuadConvexMPC(object):
         return A, B
 
 
-    def discretize_state_equation(self, A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def discretized_state_equation(self, A: np.ndarray, B: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """
             Get the discrete state matrix Ak and input matrix Bk
             using forward euler transformation, i.e.
@@ -297,7 +297,7 @@ class QuadConvexMPC(object):
 
     def cal_friction_constraint(self, support_state: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
         """
-            Generate inequality constraints that obay the friction physics
+            Generate inequality constraints that obey the friction physics
             for this moment,
                                 C f < rhs
             where f in R(3*n_leg x 1) is the leg tip force in WCS of this moment,

@@ -31,16 +31,16 @@ class RobotDynamicModel(object):
 
     # constants
     n_leg: int = 4
-    nq: int = 7 + 3*n_leg       # dimension of generized coordinates
-    nv: int = 6 + 3*n_leg       # dimension of generized velocity
+    nq: int = 7 + 3*n_leg       # dimension of generalized coordinates
+    nv: int = 6 + 3*n_leg       # dimension of generalized velocity
     support_thres: float = 0.8  # threshold to determine whether a foot is supporting or not
 
     # pinocchio model instance
     robot: pin.RobotWrapper | None = None
 
     # states
-    q: np.ndarray = np.zeros(nq)                    # generized coordinates
-    v: np.ndarray = np.zeros(nv)                    # generized velocity
+    q: np.ndarray = np.zeros(nq)                    # generalized coordinates
+    v: np.ndarray = np.zeros(nv)                    # generalized velocity
     body_R: np.ndarray = np.eye(3)                  # body rotational matrix
     support_state: np.ndarray = np.zeros(n_leg)     # support states of all legs
 
@@ -165,7 +165,7 @@ class RobotDynamicModel(object):
             Obtain body orientation quaternion in WCS
 
             Returns:
-                body_ori (array(4)): body orientatio in quaternion in WCS.
+                body_ori (array(4)): body orientation in quaternion in WCS.
         """
         return self.q[3:7]
 
@@ -272,11 +272,11 @@ class RobotDynamicModel(object):
 
     def get_contact_jcdqd_or_none(self) -> np.ndarray | None:
         """
-            Obtain contact jacobian time variation times generized velocity term, i.e. Jcdot*qdot. 
+            Obtain contact jacobian time variation times generalized velocity term, i.e. Jcdot*qdot. 
             If no leg is in supporting phase, return None.
 
             Returns:
-                Jcdqd (array(3*n_sp)): Contact jacobian time variation times generized velocity term, in Pinocchio's order. 
+                Jcdqd (array(3*n_sp)): Contact jacobian time variation times generalized velocity term, in Pinocchio's order. 
         """
         n_support_leg = self.get_n_support_legs()
 
@@ -367,7 +367,7 @@ class RobotDynamicModel(object):
                             v_tip_wcs = J_leg * v
 
             where v_tip_wcs in R3 is the linear velocity of the leg tip in WCS, 
-                  v in R(nv) is the generized velocity of the robot model.
+                  v in R(nv) is the generalized velocity of the robot model.
 
             The leg id follows the definition of pinocchio model.
 
@@ -438,10 +438,10 @@ class RobotDynamicModel(object):
                     tau_ = M * qddot + C * qdot + g - Jc(q).T * Fr
 
             Parameters:
-                a (array(nv)): generized acceleration, i.e. qddot, in Pinocchio's order.
+                a (array(nv)): generalized acceleration, i.e. qddot, in Pinocchio's order.
 
             Returns:
-                tau_ (array(nv)): generized torque, in Pinocchio's order.
+                tau_ (array(nv)): generalized torque, in Pinocchio's order.
 
         """
         # calculate net torque using dynamics
@@ -486,7 +486,7 @@ class JointOrderMapper(object):
 
     def convert_vec_to_pino(self, vec: np.ndarray) -> np.ndarray:
         """
-            convert (n_leg*3)x1 vector to pino order, 
+            convert (n_leg*3)x1 vector to pinocchio's order, 
             the vector can be q_j, v_j, a_j, fr_tip 
 
             Parameters:

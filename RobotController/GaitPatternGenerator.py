@@ -21,7 +21,7 @@ class GaitPatternGenerator(object):
     
     phase: np.ndarray = np.zeros(4) # phase for each leg
 
-    def __init__(self, name: str, total_peroid: float, offset: np.ndarray, duty: np.ndarray) -> None:
+    def __init__(self, name: str, total_period: float, offset: np.ndarray, duty: np.ndarray) -> None:
         """
             Create a gait pattern generator.
 
@@ -32,7 +32,7 @@ class GaitPatternGenerator(object):
                 duty (array(n_leg)): ratio of the supporting time for each leg in a step
         """
         self.gait_name = name
-        self.total_period = total_peroid
+        self.total_period = total_period
         self.offset = offset
         self.duty = duty
         self.time = 0

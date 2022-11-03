@@ -120,7 +120,7 @@ class RobotKineticModel(object):
         """
             Calculate the contact jacobian of the given leg.
                     v_tip_leg_wcs = Jc * v
-            Note that v is the generized velocity, defined as
+            Note that v is the generalized velocity, defined as
                     v = [vx vy vz wx wy wz vj1 vj2 ... vj12]
             [vx vy vz] and [wx wy wz] are the body linear and angular velocity, in Body local CS.
             [vj1, vj2, ... vj12] is the joint velocity, in Our/Pybullet order.
@@ -140,7 +140,7 @@ class RobotKineticModel(object):
         jleg = self.body_R_ @ self.hip_R_[leg_id,:,:] @ self.leg_jac_[leg_id,:,:]
         jc = np.zeros((3, 6 + self.n_leg * 3))
 
-        # convert body generized velocity from world cs to body cs, 
+        # convert body generalized velocity from world cs to body cs, 
         # as the same to the definitions used in Pinocchio and MIT codes
         jc[0:3,0:3] = np.eye(3) @ self.body_R_
         jc[0:3,3:6] = -jori @ self.body_R_
@@ -326,7 +326,7 @@ class RobotKineticModel(object):
     def get_hip_pos_body_with_offset(self) -> np.ndarray:
         """
             Get the hip position with the HIP OFFSET of all legs, in Body CS.
-            The offseted hip position is just above the tip position when the leg is standing upright. 
+            The offset hip position is just above the tip position when the leg is standing upright. 
             This value is useful for predicting the next foothold.
 
             Returns:
