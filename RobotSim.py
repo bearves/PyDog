@@ -1,7 +1,7 @@
 import os
+import numpy as np
 import pybullet as pb
 import pybullet_data as pb_data
-import numpy as np
 from scipy.spatial.transform import Rotation as rot
 import matplotlib.pyplot as plt
 

@@ -36,7 +36,7 @@ class RobotDynamicModel(object):
     support_thres: float = 0.8  # threshold to determine whether a foot is supporting or not
 
     # pinocchio model instance
-    robot: pin.RobotWrapper | None = None
+    robot: pin.RobotWrapper = None
 
     # states
     q: np.ndarray = np.zeros(nq)                    # generalized coordinates
@@ -140,7 +140,7 @@ class RobotDynamicModel(object):
         self.C = pin.computeCoriolisMatrix(self.robot.model, self.robot.data, self.q, self.v)
 
 
-    def update_support_states(self, support_state: list | np.ndarray):
+    def update_support_states(self, support_state: np.ndarray):
         """
             Update robot support states.
 
@@ -239,7 +239,7 @@ class RobotDynamicModel(object):
         return self.support_state[leg_id] > self.support_thres
 
 
-    def get_contact_jacobian_or_none(self) -> np.ndarray | None:
+    def get_contact_jacobian_or_none(self) -> np.ndarray:
         """
             Obtain contact jacobian Jc, defined as
 
@@ -270,7 +270,7 @@ class RobotDynamicModel(object):
                 cnt += 1
         return Jc
 
-    def get_contact_jcdqd_or_none(self) -> np.ndarray | None:
+    def get_contact_jcdqd_or_none(self) -> np.ndarray:
         """
             Obtain contact jacobian time variation times generalized velocity term, i.e. Jcdot*qdot. 
             If no leg is in supporting phase, return None.
