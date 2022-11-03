@@ -147,7 +147,7 @@ class RobotDynamicModel(object):
             Parameters:
                 support_state (array(n_leg)): current support state of the robot.
         """
-        self.support_state = support_state
+        self.support_state = support_state.copy()
 
     
     def get_body_pos_wcs(self) -> np.ndarray:

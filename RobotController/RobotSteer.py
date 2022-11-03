@@ -55,6 +55,14 @@ class RobotSteer(object):
         """
         self.direction_flag = [0, 0, 0, 0, 0, 0]
 
+    
+    def set_direction_flag(self, df:list[int]):
+        """
+            Set all direction flags
+        """
+        self.direction_flag = df.copy() 
+
+
     def set_forward(self):
         """
             Set move forward flag

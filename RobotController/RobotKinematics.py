@@ -92,12 +92,12 @@ class RobotKineticModel(object):
                 joint_actpos   (array(n_leg*3)): current joint position, in Our/Pybullet's order.
                 joint_actvel   (array(n_leg*3)): current joint velocity, in Our/Pybullet's order.
         """
-        self.body_pos_ = body_pos
-        self.body_vel_ = body_vel
-        self.body_orn_ = body_orn
-        self.body_angvel_ = body_angvel
-        self.jnt_pos_ = jnt_actpos
-        self.jnt_vel_ = jnt_actvel
+        self.body_pos_ = body_pos.copy()
+        self.body_vel_ = body_vel.copy()
+        self.body_orn_ = body_orn.copy()
+        self.body_angvel_ = body_angvel.copy()
+        self.jnt_pos_ = jnt_actpos.copy()
+        self.jnt_vel_ = jnt_actvel.copy()
 
         self.body_R_ = Rot.from_quat(body_orn).as_matrix()
         self.body_euler_ = Rot.from_quat(body_orn).as_euler('ZYX')

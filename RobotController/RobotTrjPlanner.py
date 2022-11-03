@@ -45,10 +45,10 @@ class BodyTrjPlanner(object):
                 body_vel    (array(3)): body linear velocity in WCS.
                 body_angvel (array(3)): body angular velocity in WCS.
         """
-        self.ref_body_pos = body_pos
-        self.ref_body_orn = body_orn
-        self.ref_body_vel = body_vel
-        self.ref_body_angvel = body_angvel
+        self.ref_body_pos = body_pos.copy()
+        self.ref_body_orn = body_orn.copy()
+        self.ref_body_vel = body_vel.copy()
+        self.ref_body_angvel = body_angvel.copy()
 
 
     def update_ref_state(self, vel_cmd_wcs: np.ndarray):
