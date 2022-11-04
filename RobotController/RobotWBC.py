@@ -147,7 +147,7 @@ class QuadSingleBodyWBC(object):
         wdot_ext = self.kpt * self.x_err[0:3] + self.kdt * self.x_err[6:9]
         
         b = np.zeros(6)
-        b[0:3] = self.mb * (vdot_ext + np.array([0, 0, 9.81])) 
+        b[0:3] = self.mb * (vdot_ext + np.array([0.38, 0, 9.81])) 
         b[3:6] = Iw @ wdot_ext
 
         A = np.zeros((6, self.dim_u))

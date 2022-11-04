@@ -50,7 +50,7 @@ body_orn = np.array([0, 0, 0, 1])
 body_vel = np.zeros(3)
 body_angvel = np.zeros(3)
 
-gait_controller = RobotGaitControl.QuadGaitController()
+gait_controller = RobotGaitControl.QuadGaitController(use_mpc=True, use_wbic=True)
 feedbacks = RobotGaitControl.QuadControlInput()
 user_cmd = RobotGaitControl.QuadRobotCommands()
 
@@ -159,6 +159,6 @@ while 1:
     #time.sleep(time_step)
     cam_pos = body_pos.copy()
     cam_pos[2] = 0.2
-    pb.resetDebugVisualizerCamera(1, 180, -10, cam_pos)
+    pb.resetDebugVisualizerCamera(1, 180, -30, cam_pos)
 
     

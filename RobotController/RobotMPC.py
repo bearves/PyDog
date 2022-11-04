@@ -28,7 +28,7 @@ class QuadConvexMPC(object):
     fz_max : float = 150                           # maximum vertical force for supporting leg
 
     # MPC weights
-    Qk = np.diag([100,100,100,1,1,100,1,1,1,1,1,1,0]) 
+    Qk = np.diag([100,100,0,0,0,100,1,1,1,1,1,1,0]) 
     Rk = 1e-6 * np.eye(dim_u)
 
     # MPC matrix lists

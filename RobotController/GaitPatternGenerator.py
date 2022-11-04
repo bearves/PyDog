@@ -118,7 +118,7 @@ class GaitPatternGenerator(object):
             Returns:
                 indicator (bool): can switch = True, cannot switch = False.
         """
-        if math.fabs(self.total_phase) < 1e-6:
+        if math.fabs(self.total_phase) < 1e-3:
             return True
         return False
 
