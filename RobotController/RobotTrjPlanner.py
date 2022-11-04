@@ -63,14 +63,14 @@ class BodyTrjPlanner(object):
         self.ref_body_vel[0:2] = self.vel_cmd[0:2]
         self.ref_body_vel[2] = 0 # currently, robot height is invariant
 
-        # update next position by integration
+        # update next position by integration (TODO: Here could be a bug?)
         self.ref_body_pos[0:2] += self.ref_body_vel[0:2] * self.dt 
 
         self.ref_body_angvel[0:2] = np.zeros(2) # currently, always let rx and ry be zero.
         self.ref_body_angvel[2] = self.vel_cmd[2]
         wx, wy, wz = self.ref_body_angvel[0], self.ref_body_angvel[1], self.ref_body_angvel[2]
 
-        # update next orientation by quaternion integration
+        # update next orientation by quaternion integration (TODO: Here could be a bug?)
         mat_omega = np.array([[  0,  wz, -wy, wx],
                               [-wz,   0,  wx, wy],
                               [ wy, -wx,   0, wz],

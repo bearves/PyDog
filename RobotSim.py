@@ -254,16 +254,16 @@ while 1:
 
             # predict future support state
             support_state_future_traj = current_gpg.predict_mpc_support_state(
-                mpc.horizon_length, mpc.dt_mpc)
+                mpc.dt_mpc, mpc.horizon_length)
 
             # generate future body trajectory
             body_ref_traj = body_planner.predict_future_body_ref_traj(
-                time_step, mpc.horizon_length)
+                mpc.dt_mpc, mpc.horizon_length)
             body_future_euler = body_ref_traj[:, 0:3]
 
             # predict future foot position
 
-            foothold_future_traj = foothold_planner.predict_future_foot_pos(time_step,
+            foothold_future_traj = foothold_planner.predict_future_foot_pos(mpc.dt_mpc,
                                                                             mpc.horizon_length,
                                                                             support_state_future_traj)
 
@@ -292,7 +292,7 @@ while 1:
 
         # then set ref position and velocity for tasks
         task_ref = np.zeros(7+12)
-        task_ref[0:3] = body_planner.ref_body_pos # pos
+        #task_ref[0:3] = body_planner.ref_body_pos # pos
         task_ref[0:3] = body_pos # pos
         task_ref[3:7] = body_planner.ref_body_orn # ori
         leg_tip_pos_wcs_ref_pino = mapper.convert_vec_to_pino(tip_pos_wcs)

@@ -2,14 +2,14 @@ import os
 import numpy as np
 from scipy.spatial.transform import Rotation as rot
 
-from RobotKinematics import RobotKineticModel
-from RobotDynamics import RobotDynamicModel, JointOrderMapper
-from GaitPatternGenerator import GaitPatternGenerator
-from RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
-from RobotMPC import QuadConvexMPC
-from RobotWBC import QuadSingleBodyWBC
-from RobotWBIC import QuadWBIC
-from RobotSteer import RobotSteer, DirectionFlag
+from RobotController.RobotKinematics import RobotKineticModel
+from RobotController.RobotDynamics import RobotDynamicModel, JointOrderMapper
+from RobotController.GaitPatternGenerator import GaitPatternGenerator
+from RobotController.RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
+from RobotController.RobotMPC import QuadConvexMPC
+from RobotController.RobotWBC import QuadSingleBodyWBC
+from RobotController.RobotWBIC import QuadWBIC
+from RobotController.RobotSteer import RobotSteer, DirectionFlag
 
 class QuadControlInput(object):
     """
@@ -36,8 +36,8 @@ class QuadRobotCommands(object):
     """
         Control commands from the operator
     """
-    gait_switch   : bool
-    direction_flag: list[int]
+    gait_switch   : bool = False
+    direction_flag: list[int] = [0, 0, 0, 0, 0, 0]
 
 
 class QuadControlOutput(object):
@@ -57,7 +57,7 @@ class QuadGaitController(object):
     # control constants
     n_leg: int = 4
     dt: float = 1./1000.
-    use_mpc: bool = True
+    use_mpc: bool = False
 
     # gait pattern generator
     stand_gait:    GaitPatternGenerator
@@ -80,7 +80,7 @@ class QuadGaitController(object):
     wbic: QuadWBIC
 
     # Robot steer
-    steer: RobotSteer
+    robot_steer: RobotSteer
 
     # state variables
     count: int
@@ -90,6 +90,17 @@ class QuadGaitController(object):
     tip_act_vel: np.ndarray
     tip_ref_pos: np.ndarray
     tip_ref_vel: np.ndarray
+
+    last_body_euler_ypr: np.ndarray
+
+    # control internal outputs
+    u_mpc: np.ndarray
+    u_wbc: np.ndarray
+    ref_leg_force_wcs: np.ndarray
+    jnt_ref_pos_wbic:  np.ndarray
+    jnt_ref_vel_wbic:  np.ndarray
+    jnt_ref_trq_wbic:  np.ndarray
+    jnt_ref_trq_final: np.ndarray
 
     def __init__(self) -> None:
         """
@@ -133,7 +144,7 @@ class QuadGaitController(object):
         self.wbic = QuadWBIC()
 
         # setup robot steer
-        self.steer = RobotSteer()
+        self.robot_steer = RobotSteer()
 
         # init variables
         self.count = 0
@@ -143,6 +154,16 @@ class QuadGaitController(object):
         self.tip_act_vel = np.zeros(self.n_leg * 3)
         self.tip_ref_pos = np.zeros(self.n_leg * 3)
         self.tip_ref_vel = np.zeros(self.n_leg * 3)
+
+        self.last_body_euler_ypr = np.zeros(3)
+
+        self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
+        self.u_wbc = np.zeros(3*self.n_leg)
+        self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
+        self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_vel_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_trq_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_trq_final = np.zeros(3*self.n_leg)
 
 
     def load(self, feedbacks: QuadControlInput):
@@ -173,8 +194,20 @@ class QuadGaitController(object):
         tip_init_pos, _ = self.kin_model.get_tip_state_world()
         self.foothold_planner.init_footholds(tip_init_pos)
 
+        self.last_body_euler_ypr = body_euler
 
-    def control_step(self, feedbacks: QuadControlInput, cmd: QuadRobotCommands) -> np.ndarray:
+        self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
+        self.u_wbc = np.zeros(3*self.n_leg)
+        self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
+        self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_vel_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_trq_wbic = np.zeros(3*self.n_leg)
+        self.jnt_ref_trq_final = np.zeros(3*self.n_leg)
+
+
+    def control_step(self, 
+                     feedbacks: QuadControlInput, 
+                     cmd: QuadRobotCommands) -> QuadControlOutput:
         """
             Run the controller.
             This method should be called at every control step.
@@ -189,16 +222,26 @@ class QuadGaitController(object):
         self.trajectory_planning(feedbacks)
 
         # body control
-        if self.use_mpc and self.mpc.need_solve(self.count - 1):
-            self.solve_mpc()
+        if self.use_mpc:
+            if self.mpc.need_solve(self.count - 1):
+                self.solve_mpc(feedbacks)
+            self.ref_leg_force_wcs = self.u_mpc[:, 0]
         else:
-            self.solve_wbc()
+            if self.wbc.need_solve(self.count - 1):
+                self.solve_wbc(feedbacks)
+            self.ref_leg_force_wcs = self.u_wbc
         # solve wbic
-        self.solve_wbic()
+        self.solve_wbic(feedbacks)
         # joint trq control
-        self.joint_trq_control()
+        self.joint_trq_control(feedbacks)
+        
         # log necessary data
-        self.log_data()
+        # self.log_data()
+
+        output = QuadControlOutput()
+        output.joint_tgt_trq = self.jnt_ref_trq_final
+
+        return output
 
 
     def handle_cmd(self, cmd: QuadRobotCommands):
@@ -206,12 +249,12 @@ class QuadGaitController(object):
             Handle user commands.
         """
         # set gait switch flag. This flag will be cleared after
-        # the gait has successfull switched
+        # the gait has successfully switched
         if cmd.gait_switch:
             self.gait_switch_cmd = True
             cmd.gait_switch = False
         
-        self.steer.set_direction_flag(cmd.direction_flag)
+        self.robot_steer.set_direction_flag(cmd.direction_flag)
 
     
     def update_gait_states(self, feedbacks: QuadControlInput):
@@ -224,6 +267,7 @@ class QuadGaitController(object):
            self.current_gait.gait_name != 'trot' and \
            self.current_gait.can_switch():
 
+            print("Switch to trot at %f" % feedbacks.time_now)
             self.current_gait = self.trot_gait
             self.current_gait.set_start_time(feedbacks.time_now)
             self.gait_switch_cmd = False
@@ -234,9 +278,9 @@ class QuadGaitController(object):
             self.current_gait.get_current_support_state()
 
         # update vel cmd for planners
-        self.steer.update_vel_cmd(feedbacks.body_orn)
+        self.robot_steer.update_vel_cmd(feedbacks.body_orn)
 
-        # update kinematic and dynamic model
+        # update kinematic model
         self.kin_model.update(
             feedbacks.body_pos, feedbacks.body_orn,
             feedbacks.body_vel, feedbacks.body_angvel,
@@ -245,20 +289,12 @@ class QuadGaitController(object):
         self.tip_act_pos, self.tip_act_vel = \
             self.kin_model.get_tip_state_world()
 
-        self.dyn_model.update(
-            feedbacks.body_pos, feedbacks.body_orn,
-            feedbacks.body_vel, feedbacks.body_angvel,
-            feedbacks.jnt_act_pos, feedbacks.jnt_act_vel
-        )
-        self.dyn_model.update_support_states(
-            self.current_support_state
-        )
     
     def trajectory_planning(self, feedbacks: QuadControlInput):
         """
             Plan reference trajectories for body and legs.
         """
-        filtered_vel_cmd = self.steer.get_vel_cmd_wcs()
+        filtered_vel_cmd = self.robot_steer.get_vel_cmd_wcs()
         # calculate trajectory for body in wcs
         self.body_planner.update_ref_state(filtered_vel_cmd)
 
@@ -297,48 +333,152 @@ class QuadGaitController(object):
                         swing_time_ratio, swing_time_ratio_dot)
 
     
-    def solve_mpc(self):
-        # current body state
-        body_euler_ypr = rot.from_quat(body_orn).as_euler('ZYX')
+    def solve_mpc(self, feedbacks: QuadControlInput):
+        """
+            Solve MPC problem for robot body balance control
+        """
+        # Step 1. Build current body state
+        current_state = self.build_current_state(feedbacks)
 
-        # prevent euler angle range skip
-        if body_euler_ypr[0] - last_body_euler_ypr[0] < -6.1:
-            body_euler_ypr[0] = body_euler_ypr[0] + 2*np.pi
-            print('Euler angle jump')
-        elif body_euler_ypr[0] - last_body_euler_ypr[0] > 6.1:
-            body_euler_ypr[0] = body_euler_ypr[0] - 2*np.pi
-            print('Euler angle jump')
+        # Step 2. Predict future support state
+        support_state_future_traj = self.current_gait.predict_mpc_support_state(
+            self.mpc.dt_mpc, self.mpc.horizon_length)
 
-        current_state = np.ones(13)
-        # theta ( roll, pitch, yaw )
-        current_state[0:3] = np.flip(body_euler_ypr)
-        current_state[3:6] = body_pos  # x, y, z
-        current_state[6:9] = body_angvel  # wx, wy, wz
-        current_state[9:12] = body_vel  # vx, vy, vz
-        current_state[12] = -9.81      # g constant
-
-        last_body_euler_ypr = body_euler_ypr
-
-        # predict future support state
-        support_state_future_traj = current_gpg.predict_mpc_support_state(
-            mpc.horizon_length, mpc.dt_mpc)
-
-        # generate future body trajectory
-        body_ref_traj = body_planner.predict_future_body_ref_traj(
-            time_step, mpc.horizon_length)
+        # Step 3. Generate future body trajectory
+        body_ref_traj = self.body_planner.predict_future_body_ref_traj(
+            self.mpc.dt_mpc, self.mpc.horizon_length)
         body_future_euler = body_ref_traj[:, 0:3]
 
-        # predict future foot position
+        # Step 4. Predict future foot position
 
-        foothold_future_traj = foothold_planner.predict_future_foot_pos(time_step,
-                                                                        mpc.horizon_length,
-                                                                        support_state_future_traj)
+        foothold_future_traj = \
+            self.foothold_planner.predict_future_foot_pos(self.mpc.dt_mpc,
+                                                          self.mpc.horizon_length,
+                                                          support_state_future_traj)
 
-        # solve mpc problem
+        # Step 5. Solve MPC problem
         #print('MPC solving')
-        mpc.update_mpc_matrices(
+        self.mpc.update_mpc_matrices(
             body_future_euler, foothold_future_traj,
             support_state_future_traj, current_state,
             body_ref_traj)
-        mpc.update_super_matrices()
-        u_mpc = mpc.solve()
+        self.mpc.update_super_matrices()
+        self.u_mpc = self.mpc.solve()
+
+
+    def solve_wbc(self, feedbacks: QuadControlInput):
+        """
+            Solve WBC problem for robot body balance control
+        """
+        # Step 1. Build current body state
+        current_state = self.build_current_state(feedbacks)
+
+        # Step 2. Get current body reference
+        body_ref_traj = self.body_planner.predict_future_body_ref_traj(
+            self.wbc.dt_wbc, 1)
+
+        # Step 3. Solve WBC problem
+        self.wbc.update_wbc_matrices(
+            feedbacks.body_orn, self.tip_act_pos, 
+            self.current_support_state, 
+            current_state[0:12], 
+            body_ref_traj[0, 0:12])
+        
+        self.u_wbc = self.wbc.solve()
+    
+
+    def solve_wbic(self, feedbacks: QuadControlInput):
+        """
+            Solve WBIC problem to obtain robot joint reference pos/vel and feed-forward trq 
+        """
+        # Step 1. Map joint order to Pinocchio's definition and 
+        #         update dynamic model
+        jnt_pos_act_pino = self.idx_mapper.convert_vec_to_pino(feedbacks.jnt_act_pos)
+        jnt_vel_act_pino = self.idx_mapper.convert_vec_to_pino(feedbacks.jnt_act_vel)
+        support_state_act_pino = self.idx_mapper.convert_sps_to_pino(self.current_support_state)
+
+        self.dyn_model.update(
+            feedbacks.body_pos, feedbacks.body_orn, 
+            feedbacks.body_vel, feedbacks.body_angvel, 
+            jnt_pos_act_pino, jnt_vel_act_pino)
+
+        self.dyn_model.update_support_states(support_state_act_pino)
+
+        # Step 2. Set ref position, velocity and acceleration for tasks
+        task_ref = np.zeros(7+self.n_leg*3)
+        #task_ref[0:3] = self.body_planner.ref_body_pos # pos
+        task_ref[0:3] = feedbacks.body_pos # pos
+        task_ref[3:7] = self.body_planner.ref_body_orn # ori
+        leg_tip_pos_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_pos)
+        task_ref[7:19] = leg_tip_pos_wcs_ref_pino # leg tip pos
+
+        task_dot_ref = np.zeros(6+self.n_leg*3)
+        task_dot_ref[0:3] = self.body_planner.ref_body_vel # pos
+        task_dot_ref[3:6] = self.body_planner.ref_body_angvel # ori
+        leg_tip_vel_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_vel)
+        task_dot_ref[6:18] = leg_tip_vel_wcs_ref_pino # leg tip pos
+
+        task_ddot_ref = np.zeros(6+self.n_leg*3)
+        # TODO: Plan accelerations for them
+        #task_ddot_ref[0:3] = body_acc_ref # pos
+        #task_ddot_ref[3:6] = body_angacc_ref # ori
+        #leg_tip_acc_wcs_ref_pino = mapper.convert_vec_to_pino(leg_tip_acc_wcs_ref)
+        #task_ddot_ref[6:18] = leg_tip_acc_wcs_ref_pino # leg tip pos
+
+        ref_leg_force_wcs_pino = self.idx_mapper.convert_vec_to_pino(self.ref_leg_force_wcs)
+        # now we can run wbic
+        ret = self.wbic.update(self.dyn_model,
+                          task_ref,
+                          task_dot_ref,
+                          task_ddot_ref,
+                          ref_leg_force_wcs_pino
+                          )
+        dq = self.idx_mapper.convert_jvec_to_our(ret[0])
+        self.jnt_ref_pos_wbic = feedbacks.jnt_act_pos + dq
+        self.jnt_ref_vel_wbic = self.idx_mapper.convert_jvec_to_our(ret[1])
+        self.jnt_ref_trq_wbic = self.idx_mapper.convert_jvec_to_our(ret[2])
+
+
+    def joint_trq_control(self, feedbacks: QuadControlInput):
+        """
+            Joint PD controller with torque feed-forward
+        """
+        for leg in range(4):
+            if self.current_support_state[leg] == 1:  # stance
+                kp, kd = 10, 1
+            else:  # swing
+                kp, kd = 10, 1
+
+        pos_err = self.jnt_ref_pos_wbic - feedbacks.jnt_act_pos
+        vel_err = self.jnt_ref_vel_wbic - feedbacks.jnt_act_vel
+
+        trq_final = kp * pos_err + kd * vel_err + self.jnt_ref_trq_wbic
+
+        max_trq = 50
+        self.jnt_ref_trq_final = np.clip(trq_final, -max_trq, max_trq)
+
+
+    def build_current_state(self, feedbacks: QuadControlInput) -> np.ndarray:
+        """
+            Build robot current state vector for MPC/WBC solver
+        """
+        # get body euler angles
+        body_euler_ypr = rot.from_quat(feedbacks.body_orn).as_euler('ZYX')
+        # prevent euler angle range skip
+        if body_euler_ypr[0] - self.last_body_euler_ypr[0] < -6.1:
+            body_euler_ypr[0] = body_euler_ypr[0] + 2*np.pi
+            print('Euler angle jump')
+        elif body_euler_ypr[0] - self.last_body_euler_ypr[0] > 6.1:
+            body_euler_ypr[0] = body_euler_ypr[0] - 2*np.pi
+            print('Euler angle jump')
+        
+        self.last_body_euler_ypr = body_euler_ypr
+
+        current_state = np.ones(13) # current state for MPC
+        current_state[0:3] = np.flip(body_euler_ypr) # theta ( roll, pitch, yaw )
+        current_state[3:6] = feedbacks.body_pos  # x, y, z
+        current_state[6:9] = feedbacks.body_angvel  # wx, wy, wz
+        current_state[9:12] = feedbacks.body_vel  # vx, vy, vz
+        current_state[12] = -9.81      # g constant
+
+        return current_state

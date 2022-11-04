@@ -11,7 +11,7 @@ class QuadConvexMPC(object):
     # MPC settings
     leap: int = 25                 # Solve MPC every (leap) simulating step
     dt: float = 1/1000.            # time step of the simulator
-    dt_mpc: float = 1/1000. * leap # MPC solving time interval
+    dt_mpc: float = dt * leap # MPC solving time interval
     horizon_length: int = 20       # prediction horizon length of MPC
 
     # System config

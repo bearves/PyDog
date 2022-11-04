@@ -12,7 +12,7 @@ class QuadSingleBodyWBC(object):
     # WBC settings
     leap: int = 25                  # Solve WBC every (leap) simulating step
     dt: float = 1/1000.             # time step of the simulator
-    dt_wbc: float = 1/1000. * leap  # WBC solving time interval
+    dt_wbc: float = dt * leap  # WBC solving time interval
 
     # System config
     n_leg: int = 4
@@ -147,7 +147,7 @@ class QuadSingleBodyWBC(object):
         wdot_ext = self.kpt * self.x_err[0:3] + self.kdt * self.x_err[6:9]
         
         b = np.zeros(6)
-        b[0:3] = self.mb * (vdot_ext + np.array([0.38, 0, 9.81])) 
+        b[0:3] = self.mb * (vdot_ext + np.array([0, 0, 9.81])) 
         b[3:6] = Iw @ wdot_ext
 
         A = np.zeros((6, self.dim_u))

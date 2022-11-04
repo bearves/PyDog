@@ -87,6 +87,8 @@
         - checkout why? (ONGOTING)
     - TODO: FIX: Non smooth joint pos trajectory
         - Reason: Late touchdown?
+    - TODO: FIX: When turn 180 deg/large angle, the whole robot lost control
+        - FIX: large angle, wbc has bug
 
 11. Change simulator and re-write simulation codes
 

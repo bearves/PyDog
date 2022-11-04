@@ -83,13 +83,13 @@ class GaitPatternGenerator(object):
         return support_state
         
 
-    def predict_mpc_support_state(self, horizon_length: int, dt_mpc: float) -> np.ndarray:
+    def predict_mpc_support_state(self, dt_mpc: float, horizon_length: int) -> np.ndarray:
         """
             Obtain the support state sequence within the prediction horizon.
 
             Parameters:
-                horizon_length (int) : length of the MPC horizon, i.e. the prediction steps ahead current time.
                 dt_mpc        (float): the time interval of a prediction step in MPC.
+                horizon_length (int) : length of the MPC horizon, i.e. the prediction steps ahead current time.
             
             Returns:
                 mpc_support_state (array(horizon_length, n_leg)): 
