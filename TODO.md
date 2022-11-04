@@ -88,6 +88,7 @@
     - TODO: FIX: Non smooth joint pos trajectory
         - Reason: Late touchdown?
     - TODO: FIX: When turn 180 deg/large angle, the whole robot lost control
+        - Reason: wrong set to WBIC's body ref orn 
 
 11. Change simulator and re-write simulation codes
 

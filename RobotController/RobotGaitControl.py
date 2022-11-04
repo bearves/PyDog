@@ -58,7 +58,6 @@ class QuadGaitController(object):
     n_leg: int = 4
     dt: float = 1./1000.
     use_mpc: bool = True
-    use_wbic: bool = True
 
     # gait pattern generator
     stand_gait:    GaitPatternGenerator
@@ -103,13 +102,12 @@ class QuadGaitController(object):
     jnt_ref_trq_wbic:  np.ndarray
     jnt_ref_trq_final: np.ndarray
 
-    def __init__(self, use_mpc: bool, use_wbic: bool) -> None:
+    def __init__(self, use_mpc: bool) -> None:
         """
             Create quadruped robot gait controller.
         """
         # setup controller options
         self.use_mpc = use_mpc
-        self.use_wbic = use_wbic
 
         # setup gait generator
         self.stand_gait = GaitPatternGenerator(
@@ -235,10 +233,8 @@ class QuadGaitController(object):
                 self.solve_wbc(feedbacks)
             self.ref_leg_force_wcs = self.u_wbc
         # solve wbic
-        if self.use_wbic:
-            self.solve_wbic(feedbacks)
-        else:
-            self.solve_static_dyn()
+        self.solve_wbic(feedbacks)
+        self.solve_static_dyn()
         # joint trq control
         self.joint_trq_control(feedbacks)
         
@@ -415,7 +411,8 @@ class QuadGaitController(object):
         task_ref = np.zeros(7+self.n_leg*3)
         #task_ref[0:3] = self.body_planner.ref_body_pos # pos
         task_ref[0:3] = feedbacks.body_pos # pos
-        task_ref[3:7] = self.body_planner.ref_body_orn # ori
+        #task_ref[3:7] = self.body_planner.ref_body_orn # ori
+        task_ref[3:7] = feedbacks.body_orn
         leg_tip_pos_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_pos)
         task_ref[7:19] = leg_tip_pos_wcs_ref_pino # leg tip pos
 
@@ -458,32 +455,17 @@ class QuadGaitController(object):
         """
             Joint PD controller with torque feed-forward
         """
-        trq_final = np.zeros(3*self.n_leg)
-        if self.use_wbic:
-            for leg in range(4):
-                if self.current_support_state[leg] == 1:  # stance
-                    kp, kd = 10, 1
-                else:  # swing
-                    kp, kd = 10, 1
+        for leg in range(4):
+            if self.current_support_state[leg] == 1:  # stance
+                kp, kd = 10, 1
+            else:  # swing
+                kp, kd = 10, 1
 
-            pos_err = self.jnt_ref_pos_wbic - feedbacks.jnt_act_pos
-            vel_err = self.jnt_ref_vel_wbic - feedbacks.jnt_act_vel
+        pos_err = self.jnt_ref_pos_wbic - feedbacks.jnt_act_pos
+        vel_err = self.jnt_ref_vel_wbic - feedbacks.jnt_act_vel
 
-            trq_final = kp * pos_err + kd * vel_err + self.jnt_ref_trq_wbic
-        else:
-            jnt_tgt_pos, jnt_tgt_vel = self.kin_model.whole_body_ik(self.tip_ref_pos, self.tip_ref_vel)
-            for leg in range(4):
-                idx = range(0+leg*3, 3+leg*3)
-                if self.current_support_state[leg] == 1:  # stance
-                    kp, kd = 0, 1
-                    pos_err = jnt_tgt_pos[idx]-feedbacks.jnt_act_pos[idx]
-                    vel_err = jnt_tgt_vel[idx]-feedbacks.jnt_act_vel[idx]
-                    trq_final[idx] = kd * vel_err + self.jnt_trq_static_dyn[idx] # just damp actual velocity
-                else:  # swing
-                    kp, kd = 120, 2
-                    pos_err = jnt_tgt_pos[idx]-feedbacks.jnt_act_pos[idx]
-                    vel_err = jnt_tgt_vel[idx]-feedbacks.jnt_act_vel[idx]
-                    trq_final[idx] = kp * pos_err + kd * vel_err
+        #self.jnt_ref_trq_wbic = self.jnt_trq_static_dyn.copy()
+        trq_final = kp * pos_err + kd * vel_err + self.jnt_ref_trq_wbic
 
         max_trq = 50
         self.jnt_ref_trq_final = np.clip(trq_final, -max_trq, max_trq)
