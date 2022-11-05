@@ -36,8 +36,8 @@ class QuadRobotCommands(object):
     """
         Control commands from the operator
     """
-    gait_switch   : bool = False
-    direction_flag: list[int] = [0, 0, 0, 0, 0, 0]
+    gait_switch   : bool = False                   # flag whether the user asks to switch gait
+    direction_flag: list[int] = [0, 0, 0, 0, 0, 0] # flags whether a movement direction is required, see DirectionFlag in RobotSteer.py
 
 
 class QuadControlOutput(object):
@@ -105,6 +105,9 @@ class QuadGaitController(object):
     def __init__(self, use_mpc: bool) -> None:
         """
             Create quadruped robot gait controller.
+
+            Parameters:
+                use_mpc: Set the controller to use MPC as body controller, otherwise a WBC is utilized.
         """
         # setup controller options
         self.use_mpc = use_mpc
@@ -171,8 +174,10 @@ class QuadGaitController(object):
     def load(self, feedbacks: QuadControlInput):
         """
             Setup the gait controller's initial states.
-            This method should be called once entering 
-            the gait control state.
+            This method should be called once entering the gait control state.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         self.count = 0
         self.gait_switch_cmd = False
@@ -209,15 +214,22 @@ class QuadGaitController(object):
 
     def control_step(self, 
                      feedbacks: QuadControlInput, 
-                     cmd: QuadRobotCommands) -> QuadControlOutput:
+                     user_cmd: QuadRobotCommands) -> QuadControlOutput:
         """
             Run the controller.
             This method should be called at every control step.
+            
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
+                user_cmd  (QuadRobotCommands): the user command to the gait controller.
+
+            Returns:
+                output    (QuadControlOutput): the controller's outputs to the robot.
         """
 
         self.count += 1
         # handle commands
-        self.handle_cmd(cmd)
+        self.handle_cmd(user_cmd)
         # update gait pattern and robot states
         self.update_gait_states(feedbacks)
         # trajectory planning
@@ -237,9 +249,6 @@ class QuadGaitController(object):
         self.solve_static_dyn()
         # joint trq control
         self.joint_trq_control(feedbacks)
-        
-        # log necessary data
-        # self.log_data()
 
         output = QuadControlOutput()
         output.joint_tgt_trq = self.jnt_ref_trq_final
@@ -247,22 +256,28 @@ class QuadGaitController(object):
         return output
 
 
-    def handle_cmd(self, cmd: QuadRobotCommands):
+    def handle_cmd(self, user_cmd: QuadRobotCommands):
         """
             Handle user commands.
+
+            Parameters:
+                user_cmd  (QuadRobotCommands): the user command to the gait controller.
         """
         # set gait switch flag. This flag will be cleared after
         # the gait has successfully switched
-        if cmd.gait_switch:
+        if user_cmd.gait_switch:
             self.gait_switch_cmd = True
-            cmd.gait_switch = False
+            user_cmd.gait_switch = False
         
-        self.robot_steer.set_direction_flag(cmd.direction_flag)
+        self.robot_steer.set_direction_flag(user_cmd.direction_flag)
 
     
     def update_gait_states(self, feedbacks: QuadControlInput):
         """
-            Update gait state variables
+            Update gait state variables.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
 
         # switch gait generator if cmd received
@@ -296,6 +311,9 @@ class QuadGaitController(object):
     def trajectory_planning(self, feedbacks: QuadControlInput):
         """
             Plan reference trajectories for body and legs.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         filtered_vel_cmd = self.robot_steer.get_vel_cmd_wcs()
         # calculate trajectory for body in wcs
@@ -338,7 +356,10 @@ class QuadGaitController(object):
     
     def solve_mpc(self, feedbacks: QuadControlInput):
         """
-            Solve MPC problem for robot body balance control
+            Solve MPC problem for robot body balance control.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         # Step 1. Build current body state
         current_state = self.build_current_state(feedbacks)
@@ -371,7 +392,10 @@ class QuadGaitController(object):
 
     def solve_wbc(self, feedbacks: QuadControlInput):
         """
-            Solve WBC problem for robot body balance control
+            Solve WBC problem for robot body balance control.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         # Step 1. Build current body state
         current_state = self.build_current_state(feedbacks)
@@ -392,7 +416,10 @@ class QuadGaitController(object):
 
     def solve_wbic(self, feedbacks: QuadControlInput):
         """
-            Solve WBIC problem to obtain robot joint reference pos/vel and feed-forward trq 
+            Solve WBIC problem to obtain robot joint reference pos/vel and feed-forward trq.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         # Step 1. Map joint order to Pinocchio's definition and 
         #         update dynamic model
@@ -445,15 +472,27 @@ class QuadGaitController(object):
 
     def solve_static_dyn(self):
         """
-            calculate joint trq using static dynamics
+            Calculate joint trq using static dynamics.
+                                
+                                tau = J_leg * R_hip.T * R_body.T * f_wcs
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
-        # tau = J*R*f
+        
         self.jnt_trq_static_dyn = -self.kin_model.get_joint_trq(self.ref_leg_force_wcs)
 
 
     def joint_trq_control(self, feedbacks: QuadControlInput):
         """
-            Joint PD controller with torque feed-forward
+            Joint PD controller with torque feed-forward.
+
+                        trq_cmd = kp * jnt_pos_err + kd * jnt_vel_err + tau_ff
+            
+            Note that the output is saturated(clipped).
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
         """
         for leg in range(4):
             if self.current_support_state[leg] == 1:  # stance
@@ -473,7 +512,13 @@ class QuadGaitController(object):
 
     def build_current_state(self, feedbacks: QuadControlInput) -> np.ndarray:
         """
-            Build robot current state vector for MPC/WBC solver
+            Build robot current state vector for MPC/WBC solver.
+
+            Parameters:
+                feedbacks (QuadControlInput): the robot feedbacks from simulator.
+
+            Returns:
+                current_state (array(13)): the current state vector for MPC/WBC usage.
         """
         # get body euler angles
         body_euler_ypr = rot.from_quat(feedbacks.body_orn).as_euler('ZYX')
