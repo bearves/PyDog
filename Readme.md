@@ -4,7 +4,7 @@ This project is a personal project. Its purpose is to learn the most important i
 This project is a simplified python implementation for quadruped robot simulation, based on MIT's open-sourced cheetah 3 locomotion controller and related papers. This project is neither intend to realizing a novel or full-capable locomotion control for challenging terrains and motion abilities, nor to achieving best computational performance. These features can be extended in the future, but this implementation is written in a simple and comprehensive way just to reveal the core idea of the MIT's controllers, including 
 
     - Convex model predictive controller (MPC) for floating base. 
-    - Simple PD controller for floating base. 
+    - Simple PD controller for floating base (VMC). 
     - Whole body impulse controller(WBIC). 
     - Foothold calculation based on Raibert's Law.
     - Gait scheduler and body/leg trajectory planning.

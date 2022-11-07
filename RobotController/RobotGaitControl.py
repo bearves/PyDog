@@ -7,7 +7,7 @@ from RobotController.RobotDynamics import RobotDynamicModel, JointOrderMapper
 from RobotController.GaitPatternGenerator import GaitPatternGenerator
 from RobotController.RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
 from RobotController.RobotMPC import QuadConvexMPC
-from RobotController.RobotWBC import QuadSingleBodyWBC
+from RobotController.RobotVMC import QuadSingleBodyVMC
 from RobotController.RobotWBIC import QuadWBIC
 from RobotController.RobotSteer import RobotSteer, DirectionFlag
 
@@ -75,7 +75,7 @@ class QuadGaitController(object):
     swing_traj_planner: list[SwingTrjPlanner]
 
     # controllers
-    wbc:  QuadSingleBodyWBC
+    vmc:  QuadSingleBodyVMC
     mpc:  QuadConvexMPC
     wbic: QuadWBIC
 
@@ -95,7 +95,7 @@ class QuadGaitController(object):
 
     # control internal outputs
     u_mpc: np.ndarray
-    u_wbc: np.ndarray
+    u_vmc: np.ndarray
     ref_leg_force_wcs: np.ndarray
     jnt_ref_pos_wbic:  np.ndarray
     jnt_ref_vel_wbic:  np.ndarray
@@ -107,7 +107,7 @@ class QuadGaitController(object):
             Create quadruped robot gait controller.
 
             Parameters:
-                use_mpc: Set the controller to use MPC as body controller, otherwise a WBC is utilized.
+                use_mpc: Set the controller to use MPC as body controller, otherwise a VMC is utilized.
         """
         # setup controller options
         self.use_mpc = use_mpc
@@ -145,7 +145,7 @@ class QuadGaitController(object):
         # setup controllers
         self.mpc = QuadConvexMPC(self.dt)
         self.mpc.cal_weight_matrices()
-        self.wbc = QuadSingleBodyWBC(self.dt)
+        self.vmc = QuadSingleBodyVMC(self.dt)
         self.wbic = QuadWBIC()
 
         # setup robot steer
@@ -163,7 +163,7 @@ class QuadGaitController(object):
         self.last_body_euler_ypr = np.zeros(3)
 
         self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
-        self.u_wbc = np.zeros(3*self.n_leg)
+        self.u_vmc = np.zeros(3*self.n_leg)
         self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
         self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
         self.jnt_ref_vel_wbic = np.zeros(3*self.n_leg)
@@ -204,7 +204,7 @@ class QuadGaitController(object):
         self.last_body_euler_ypr = body_euler
 
         self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
-        self.u_wbc = np.zeros(3*self.n_leg)
+        self.u_vmc = np.zeros(3*self.n_leg)
         self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
         self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
         self.jnt_ref_vel_wbic = np.zeros(3*self.n_leg)
@@ -241,9 +241,9 @@ class QuadGaitController(object):
                 self.solve_mpc(feedbacks)
             self.ref_leg_force_wcs = self.u_mpc[:, 0]
         else:
-            if self.wbc.need_solve(self.count - 1):
-                self.solve_wbc(feedbacks)
-            self.ref_leg_force_wcs = self.u_wbc
+            if self.vmc.need_solve(self.count - 1):
+                self.solve_vmc(feedbacks)
+            self.ref_leg_force_wcs = self.u_vmc
         # solve wbic
         self.solve_wbic(feedbacks)
         self.solve_static_dyn()
@@ -317,7 +317,10 @@ class QuadGaitController(object):
         """
         filtered_vel_cmd = self.robot_steer.get_vel_cmd_wcs()
         # calculate trajectory for body in wcs
-        self.body_planner.update_ref_state(filtered_vel_cmd)
+        self.body_planner.update_ref_state(
+            filtered_vel_cmd, 
+            feedbacks.body_pos, 
+            feedbacks.body_orn)
 
         # calculate foothold for legs
         self.foothold_planner.set_current_state(
@@ -390,9 +393,9 @@ class QuadGaitController(object):
         self.u_mpc = self.mpc.solve()
 
 
-    def solve_wbc(self, feedbacks: QuadControlInput):
+    def solve_vmc(self, feedbacks: QuadControlInput):
         """
-            Solve WBC problem for robot body balance control.
+            Solve VMC problem for robot body balance control.
 
             Parameters:
                 feedbacks (QuadControlInput): the robot feedbacks from simulator.
@@ -402,16 +405,16 @@ class QuadGaitController(object):
 
         # Step 2. Get current body reference
         body_ref_traj = self.body_planner.predict_future_body_ref_traj(
-            self.wbc.dt_wbc, 1)
+            self.vmc.dt_vmc, 1)
 
-        # Step 3. Solve WBC problem
-        self.wbc.update_wbc_matrices(
+        # Step 3. Solve VMC problem
+        self.vmc.update_vmc_matrices(
             feedbacks.body_orn, self.tip_act_pos, 
             self.current_support_state, 
             current_state[0:12], 
             body_ref_traj[0, 0:12])
         
-        self.u_wbc = self.wbc.solve()
+        self.u_vmc = self.vmc.solve()
     
 
     def solve_wbic(self, feedbacks: QuadControlInput):
@@ -436,10 +439,14 @@ class QuadGaitController(object):
 
         # Step 2. Set ref position, velocity and acceleration for tasks
         task_ref = np.zeros(7+self.n_leg*3)
-        #task_ref[0:3] = self.body_planner.ref_body_pos # pos
-        task_ref[0:3] = feedbacks.body_pos # pos
+        task_ref[0:3] = self.body_planner.ref_body_pos # pos
+        # FIXME: body_orn flips at some angle.
         #task_ref[3:7] = self.body_planner.ref_body_orn # ori
         task_ref[3:7] = feedbacks.body_orn
+        print('---------------------')
+        print(feedbacks.body_orn)
+        print(self.body_planner.ref_body_orn)
+        
         leg_tip_pos_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_pos)
         task_ref[7:19] = leg_tip_pos_wcs_ref_pino # leg tip pos
 
@@ -512,13 +519,13 @@ class QuadGaitController(object):
 
     def build_current_state(self, feedbacks: QuadControlInput) -> np.ndarray:
         """
-            Build robot current state vector for MPC/WBC solver.
+            Build robot current state vector for MPC/VMC solver.
 
             Parameters:
                 feedbacks (QuadControlInput): the robot feedbacks from simulator.
 
             Returns:
-                current_state (array(13)): the current state vector for MPC/WBC usage.
+                current_state (array(13)): the current state vector for MPC/VMC usage.
         """
         # get body euler angles
         body_euler_ypr = rot.from_quat(feedbacks.body_orn).as_euler('ZYX')

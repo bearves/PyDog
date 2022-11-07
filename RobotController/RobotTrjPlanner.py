@@ -51,33 +51,32 @@ class BodyTrjPlanner(object):
         self.ref_body_angvel = body_angvel.copy()
 
 
-    def update_ref_state(self, vel_cmd_wcs: np.ndarray):
+    def update_ref_state(self, 
+                         vel_cmd_wcs: np.ndarray, 
+                         act_body_pos: np.ndarray, 
+                         act_body_orn: np.ndarray):
         """
             Integrate body reference states according to the received velocity command.
 
             Parameters:
                 vel_cmd_wcs  (array(3)): velocity command in WCS, defined as [v_x, v_y, thetadot_z].
+                act_body_pos (array(3)): current body position in WCS.
+                act_body_orn (array(4)): current body orientation as quaternion in WCS. 
         """
         self.vel_cmd = vel_cmd_wcs.copy()
         
         self.ref_body_vel[0:2] = self.vel_cmd[0:2]
         self.ref_body_vel[2] = 0 # currently, robot height is invariant
 
-        # update next position by integration (TODO: Here could be a bug?)
-        self.ref_body_pos[0:2] += self.ref_body_vel[0:2] * self.dt 
+        # correct drift in X and Y
+        self.ref_body_pos[0:2] = act_body_pos[0:2]
 
         self.ref_body_angvel[0:2] = np.zeros(2) # currently, always let rx and ry be zero.
         self.ref_body_angvel[2] = self.vel_cmd[2]
-        wx, wy, wz = self.ref_body_angvel[0], self.ref_body_angvel[1], self.ref_body_angvel[2]
 
-        # update next orientation by quaternion integration (TODO: Here could be a bug?)
-        mat_omega = np.array([[  0,  wz, -wy, wx],
-                              [-wz,   0,  wx, wy],
-                              [ wy, -wx,   0, wz],
-                              [-wx, -wy, -wz,  0]])  
-        ref_body_orn_dot = 0.5 * mat_omega @ self.ref_body_orn 
-        self.ref_body_orn += ref_body_orn_dot * self.dt 
-        self.ref_body_orn /= np.linalg.norm(self.ref_body_orn) # normalization
+        # correct drift in Yaw, and keep Roll/Pitch zero at current stage
+        yaw = rot.from_quat(act_body_orn).as_euler('ZYX')[0]
+        self.ref_body_orn = rot.from_rotvec([0,0,yaw]).as_quat()
 
 
     def predict_future_body_ref_traj(self,

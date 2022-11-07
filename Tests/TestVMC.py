@@ -1,10 +1,10 @@
 import sys,os
 sys.path.append(os.getcwd()+'/..')
 import numpy as np
-from RobotController import RobotWBC as ctrl
+from RobotController import RobotVMC as ctrl
 
 
-wbc = ctrl.QuadSingleBodyWBC(1./1000.)
+vmc = ctrl.QuadSingleBodyVMC(1./1000.)
 
 body_orn = np.array([0,0,0,1])
 r_leg = np.array([0.183, -0.047, 0,
@@ -24,7 +24,7 @@ x0 = np.array([0.2,0.02,0, # R, P, Y
                0,0,0 # vx, vy, vz
                ]) 
 
-wbc.update_wbc_matrices(
+vmc.update_vmc_matrices(
     body_orn,
     r_leg, 
     support_state,
@@ -32,12 +32,12 @@ wbc.update_wbc_matrices(
     x_ref
 )
 
-print(wbc.H)
-print(wbc.G)
-print(wbc.C)
-print(wbc.c)
-print(wbc.D)
-print(wbc.d)
+print(vmc.H)
+print(vmc.G)
+print(vmc.C)
+print(vmc.c)
+print(vmc.D)
+print(vmc.d)
 
-ret = wbc.solve()
+ret = vmc.solve()
 print(ret)

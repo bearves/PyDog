@@ -4,15 +4,15 @@ from scipy.linalg import expm
 import qpsolvers
 
 
-class QuadSingleBodyWBC(object):
+class QuadSingleBodyVMC(object):
     """
-        Quadruped robot whole body controller (PID) based on single floating base dynamic.
+        Quadruped robot virtual model controller (VMC) based on single floating base dynamic.
     """
 
-    # WBC settings
-    leap: int = 25                  # Solve WBC every (leap) simulating step
+    # VMC settings
+    leap: int = 25                  # Solve VMC every (leap) simulating step
     dt: float = 1/1000.             # time step of the simulator
-    dt_wbc: float = dt * leap  # WBC solving time interval
+    dt_vmc: float = dt * leap       # VMC solving time interval
 
     # System config
     n_leg: int = 4
@@ -27,7 +27,7 @@ class QuadSingleBodyWBC(object):
     fz_min : float = 0.1                               # minimum vertical force for supporting leg
     fz_max : float = 150                               # maximum vertical force for supporting leg
 
-    # WBC weights
+    # VMC weights
     Qk = np.array([1000,1000,0,0,0,100,1,1,1,1,1,1])
     kpf = Qk[3:6]
     kdf = Qk[9:12]
@@ -38,39 +38,39 @@ class QuadSingleBodyWBC(object):
     x0 : np.ndarray = np.zeros(dim_s) # current state
     x_ref : np.ndarray = np.zeros(dim_s) # reference states
 
-    # WBC holders
+    # VMC holders
     H : np.ndarray = np.zeros((dim_u, dim_u))
     G : np.ndarray = np.zeros(dim_u)
     C : np.ndarray = np.zeros((6, ))
 
     def __init__(self, sim_dt: float):
         """
-            Create a whole body controller based on single floating base dynamic for quadruped robot.
+            Create a virtual model controller based on single floating base dynamic for quadruped robot.
 
             Parameters:
                 sim_dt (float): time step of the simulator
         """
         self.dt = sim_dt
-        self.dt_wbc = sim_dt * self.leap
+        self.dt_vmc = sim_dt * self.leap
         self.invIb = np.linalg.inv(self.Ib)
 
 
     def need_solve(self, count: int) -> bool:
         """
-            Check whether the wbc need to be solved at this time count.
+            Check whether the vmc need to be solved at this time count.
 
             Parameters:
                 count (int): step counter of the simulator
 
             Returns:
-                solve_flag (bool): a flag indicting whether wbc should be
+                solve_flag (bool): a flag indicting whether vmc should be
                                    solved at this time count
         """
         solve_flag = count % self.leap == 0
         return solve_flag
 
 
-    def update_wbc_matrices(self,
+    def update_vmc_matrices(self,
                             body_orn : np.ndarray,
                             r_leg : np.ndarray,
                             support_state : np.ndarray,
@@ -267,7 +267,7 @@ class QuadSingleBodyWBC(object):
 
     def solve(self) -> np.ndarray:
         """
-            Solve WBC problem for quadruped robot, must be called after all
+            Solve VMC problem for quadruped robot, must be called after all
             matrices have been updated. 
 
             Returns:
@@ -280,5 +280,5 @@ class QuadSingleBodyWBC(object):
                                  A=self.D, b=self.d,
                                  G=self.C, h=self.c,
                                  solver="quadprog")
-        u_wbc = res.flatten()
-        return u_wbc
+        u_vmc = res.flatten()
+        return u_vmc
