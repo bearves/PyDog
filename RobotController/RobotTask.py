@@ -133,14 +133,16 @@ class BodyOriTask(WBCTask):
         ref_omega_wcs = ref_xdot_wcs[3:6]
         ref_angacc_wcs = ref_xddot_wcs[3:6]
 
-        # orientation diff
-        # FIXME: the ori_diff_SO3 might be wrong
+        #  orientation diff:
+        #  err = pos_ref - pos_act
+        #  since there is no minus operation of orientation,
+        #  we use the following equation:
+        #              ori_err = ori_ref * inv(ori_act)
         body_R = rot.from_quat(act_ori_wcs).as_matrix()
         body_R_ref = rot.from_quat(ref_ori_wcs).as_matrix()
-        R_diff = body_R.T @ body_R_ref
+        R_diff = body_R_ref @ body_R.T
         ori_diff_SO3 = rot.from_matrix(R_diff).as_rotvec()
-        print(ori_diff_SO3)
-        
+
         self.pos_err = ori_diff_SO3
         self.vel_err = ref_omega_wcs - act_omega_wcs
         self.vel_des = ref_omega_wcs
