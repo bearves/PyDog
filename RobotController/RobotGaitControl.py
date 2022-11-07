@@ -440,12 +440,9 @@ class QuadGaitController(object):
         # Step 2. Set ref position, velocity and acceleration for tasks
         task_ref = np.zeros(7+self.n_leg*3)
         task_ref[0:3] = self.body_planner.ref_body_pos # pos
-        # FIXME: body_orn flips at some angle.
+        # FIXME: use ref body orn doesn't work.
         #task_ref[3:7] = self.body_planner.ref_body_orn # ori
         task_ref[3:7] = feedbacks.body_orn
-        print('---------------------')
-        print(feedbacks.body_orn)
-        print(self.body_planner.ref_body_orn)
         
         leg_tip_pos_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_pos)
         task_ref[7:19] = leg_tip_pos_wcs_ref_pino # leg tip pos

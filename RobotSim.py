@@ -75,6 +75,9 @@ while 1:
     feedbacks.body_orn = np.array(base_pos[1])
     feedbacks.body_angvel = np.array(base_vel[1])
 
+    if feedbacks.body_orn[3] < 0:
+        feedbacks.body_orn *= -1.
+
     # get joint states
     for i in range(act_jnt_num):
         jnt_state = pb.getJointState(dog, act_jnt_id[i])
