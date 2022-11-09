@@ -70,7 +70,7 @@ class RobotDynamicModel(object):
 
             Parameters:
                 urdf_file (str): path of the robot's urdf file.
-                mesh_dir (str): path of the directory to store the robot's mesh files.
+                mesh_dir (str): path of the parent directory to store the robot's mesh files.
         """
         os.environ['mesh_dir'] = mesh_dir
         self.robot = RobotWrapper.BuildFromURDF(

@@ -51,7 +51,10 @@ in_gait_start_time = 3.0
 in_gait = False
 
 # load controller
-gait_controller = RobotGaitControl.QuadGaitController(use_mpc=True)
+urdf_file = r'./models/a1/a2_pino.urdf'
+mesh_dir  = r'./models/a1/'
+gait_controller = RobotGaitControl.QuadGaitController(urdf_file, mesh_dir, use_mpc=True)
+        
 feedbacks = RobotGaitControl.QuadControlInput()
 user_cmd = RobotGaitControl.QuadRobotCommands()
 

@@ -102,12 +102,14 @@ class QuadGaitController(object):
     jnt_ref_trq_wbic:  np.ndarray
     jnt_ref_trq_final: np.ndarray
 
-    def __init__(self, use_mpc: bool) -> None:
+    def __init__(self, urdf_file: str, mesh_dir: str, use_mpc: bool) -> None:
         """
             Create quadruped robot gait controller.
 
             Parameters:
-                use_mpc: Set the controller to use MPC as body controller, otherwise a VMC is utilized.
+                urdf_file (str): path of the robot's urdf file.
+                mesh_dir (str): path of the parent directory to store the robot's mesh files.
+                use_mpc(bool): Set the controller to use MPC as body controller, otherwise a VMC is utilized.
         """
         # setup controller options
         self.use_mpc = use_mpc
@@ -125,8 +127,6 @@ class QuadGaitController(object):
         self.kin_model = RobotKineticModel()
 
         # setup dynamic model
-        urdf_file = r'./models/a1/a2_pino.urdf'
-        mesh_dir  = r'./models/a1/'
         os.environ['mesh_dir'] = mesh_dir
 
         self.dyn_model = RobotDynamicModel()
