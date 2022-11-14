@@ -90,6 +90,7 @@ class QuadGaitController(object):
     tip_act_vel: np.ndarray
     tip_ref_pos: np.ndarray
     tip_ref_vel: np.ndarray
+    tip_ref_acc: np.ndarray
 
     last_body_euler_ypr: np.ndarray
 
@@ -119,7 +120,7 @@ class QuadGaitController(object):
             'stand', 0.5, np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]))
 
         self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
-            [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
+            [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
         
         self.current_gait = self.stand_gait
 
@@ -159,6 +160,7 @@ class QuadGaitController(object):
         self.tip_act_vel = np.zeros(self.n_leg * 3)
         self.tip_ref_pos = np.zeros(self.n_leg * 3)
         self.tip_ref_vel = np.zeros(self.n_leg * 3)
+        self.tip_ref_acc = np.zeros(self.n_leg * 3)
 
         self.last_body_euler_ypr = np.zeros(3)
 
@@ -343,6 +345,7 @@ class QuadGaitController(object):
             if self.current_support_state[leg] == 1:  # stance
                 self.tip_ref_pos[idx] = self.foothold_planner.get_current_footholds(leg)
                 self.tip_ref_vel[idx] = np.zeros(3)
+                self.tip_ref_acc[idx] = np.zeros(3)
             else:  # swing
                 self.swing_traj_planner[leg].set_start_point(
                     self.foothold_planner.get_liftup_leg_pos(leg))
@@ -352,7 +355,7 @@ class QuadGaitController(object):
                 swing_time_ratio, swing_time_ratio_dot = \
                     self.current_gait.get_current_swing_time_ratio(leg)
                 # interpolate from last foothold to the next foothold
-                self.tip_ref_pos[idx], self.tip_ref_vel[idx]\
+                self.tip_ref_pos[idx], self.tip_ref_vel[idx], self.tip_ref_acc[idx]\
                     = self.swing_traj_planner[leg].get_tip_pos_vel(
                         swing_time_ratio, swing_time_ratio_dot)
 
@@ -446,17 +449,17 @@ class QuadGaitController(object):
         task_ref[7:19] = leg_tip_pos_wcs_ref_pino # leg tip pos
 
         task_dot_ref = np.zeros(6+self.n_leg*3)
-        task_dot_ref[0:3] = self.body_planner.ref_body_vel # pos
-        task_dot_ref[3:6] = self.body_planner.ref_body_angvel # ori
+        task_dot_ref[0:3] = self.body_planner.ref_body_vel # vel
+        task_dot_ref[3:6] = self.body_planner.ref_body_angvel # omega
         leg_tip_vel_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_vel)
-        task_dot_ref[6:18] = leg_tip_vel_wcs_ref_pino # leg tip pos
+        task_dot_ref[6:18] = leg_tip_vel_wcs_ref_pino # leg tip vel
 
         task_ddot_ref = np.zeros(6+self.n_leg*3)
         # TODO: Plan accelerations for them
-        #task_ddot_ref[0:3] = body_acc_ref # pos
-        #task_ddot_ref[3:6] = body_angacc_ref # ori
-        #leg_tip_acc_wcs_ref_pino = mapper.convert_vec_to_pino(leg_tip_acc_wcs_ref)
-        #task_ddot_ref[6:18] = leg_tip_acc_wcs_ref_pino # leg tip pos
+        task_ddot_ref[0:3] = np.zeros(3) # acc
+        task_ddot_ref[3:6] = np.zeros(3) # angacc
+        leg_tip_acc_wcs_ref_pino = self.idx_mapper.convert_vec_to_pino(self.tip_ref_acc)
+        task_ddot_ref[6:18] = leg_tip_acc_wcs_ref_pino # leg tip acc
 
         ref_leg_force_wcs_pino = self.idx_mapper.convert_vec_to_pino(self.ref_leg_force_wcs)
         # now we can run wbic

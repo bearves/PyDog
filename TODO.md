@@ -1,13 +1,13 @@
-1. MPC basic study
+1. MPC basic study (DONE)
     - MPC of CartPole
     - MPC of 1-D floating base, double input, with support switching
     - MPC of 6-D floating base, 12/18 input (configurable)
-2. Dynamic simulation environment setup
+2. Dynamic simulation environment setup (DONE)
     - Pybullet installation and setup
     - Create a quadruped robot model A1 from urdf
     - Get body states and joint states as feedback
-3. Joint PD controller
-4. MPC controller for quadruped robot
+3. Joint PD controller (DONE)
+4. MPC controller for quadruped robot (DONE)
     - Build continuous and discrete dynamics of the floating base
     - Create super matrices of the MPC problem
         - Abar, Bbar
@@ -28,31 +28,31 @@
     - Solve QP and get Fr as the tip force for stance legs
     - tau = Rbody * J_leg * Fr
 
-5. Gait scheduler
+5. Gait scheduler (DONE)
     - Duration & offset definition
     - Predict support state sequence
 
-6. Body trajectory planner
+6. Body trajectory planner (DONE)
     - Get cmd from RobotSteer
     - Generate body ref pose and euler sequence by integration
 
-7. Footholds planner
+7. Footholds planner (DONE)
     - Hold last, current footholds
     - If lft, last footholds <- current leg tip pos
     - If td, current footholds <- current leg tip pos
     - Keep calculating next footholds no matter the leg is swinging or not
         - Shoulder position prediction
         - Raibert law footholds prediction
-        - //TODO: quick spin correction, aka. the contrifugal term
+        - Quick spin correction, aka. the contrifugal term (DONE)
     - Give prediction of future tip pos
 
-8. Leg trajectory planner
+8. Leg trajectory planner (DONE)
     - Leg kinematics
         - Leg FK, IK and Jac in Leg CS
     - Interpolation from last footholds to next footholds using sin/cos curve
     - //TODO: Interpolation using bezier curve or spline
     - Get tip ref pos, ref vel in WCS
-    - //TODO: Tip ref accel in WCS
+    - Tip ref accel in WCS
 
 9. Floating base dynamics for quadruped robot (DONE)
     - Setup pinocchino dynamic engine
@@ -64,7 +64,7 @@
             - Body ori
             - Body pos
             - Tip pos of swinging legs
-        - Get body ref ori, pos, omega, vel, tip ref pos, vel, accel (TODO)
+        - Get body ref ori, pos, omega, vel, tip ref pos, vel, accel (DONE)
         - Get body actual ori, pos, omega, vel, tip actual pos, vel and update model (DONE)
         - Calculate state error (DONE)
         - Get Jc of each task from Dynamics, where vtip = Jc q (DONE) 
@@ -82,15 +82,16 @@
         - Get friction cone constrains just like MPC (DONE)
         - Solve QP and get final fr and qddot (DONE)
         - Calculate tau as Aqddot + b + g - Jc.T fr, and get final joint ff trq (DONE) 
-    - TODO: FIX: Qj error?
+    - FIX: Qj error? (DONE)
         - Reason: Actual body pos and body_ref_pos has big different 
-        - checkout why? (ONGOTING)
+        - checkout why?
+          - The body ref pos is integrated by a very rough way, which has large drift, it should be updated to align with the actual body pos to compensate the drift.
     - TODO: FIX: Non smooth joint pos trajectory
         - Reason: Late touchdown?
-    - TODO: FIX: When turn 180 deg/large angle, the whole robot lost control
+    - FIX: When turn 180 deg/large angle, the whole robot lost control (DONE)
         - Reason: wrong set to WBIC's body ref orn 
 
-11. Change simulator and re-write simulation codes
+11. Change simulator and re-write simulation codes (DONE)
 
 12. Early/Late touchdown detection and reprogramming
     - For each leg, if always early/late touchdown, slowly adjust foothold height accordingly.

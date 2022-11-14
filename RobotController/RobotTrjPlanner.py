@@ -214,15 +214,22 @@ class FootholdPlanner(object):
             hip_pos_prj[0] -= 0.029  # x compensation due to weight balance
             self.hip_pos_wcs_next_td[0+leg*3:3+leg *
                                      3] = body_pos_next_td + Rz_body_next @ hip_pos_prj
-            # thirdly, predict next foothold based on Raibert's law
+
+            # thirdly, calculate body relative height and v_now x omega_des_z
+            vxw = np.array([body_vel_now[1], -body_vel_now[0]]) * body_des_yawdot # v_now x omega_des_z
+            bh = body_pos_now[2] - np.mean(self.current_footholds[2::3])
+
+            # finally, predict next foothold based on Raibert's law, with centrifugal compensation
             #
-            #  p_next = p_h + Tst/2 * v_now + k * (v_des - v_now)
+            #  p_next = p_h + Tst/2*v_now + k*(v_des-v_now) + 1/2*sqrt(bh/g)*(v_now x omega_des_z)
             #
-            self.next_footholds[0+leg*3:2+leg*3] = self.hip_pos_wcs_next_td[0+leg*3:2+leg*3] + \
+            self.next_footholds[0+leg*3:2+leg*3] = \
+                self.hip_pos_wcs_next_td[0+leg*3:2+leg*3] + \
                 t_stance_all[leg] * 0.5 * body_vel_now[0:2] + \
-                k * (body_vel_now[0:2] - body_des_vel_cmd[0:2])
+                k * (body_vel_now[0:2] - body_des_vel_cmd[0:2]) + \
+                0.5 * bh/9.81 * vxw
             # slightly below ground, considering the foot size
-            self.next_footholds[2+leg*3] = 0.0199
+            self.next_footholds[2+leg*3] = 0.0159
 
 
     def predict_future_foot_pos(self,
@@ -344,7 +351,7 @@ class SwingTrjPlanner(object):
 
     def get_tip_pos_vel(self, 
                         time_ratio: float, 
-                        time_ratio_dot: float) -> tuple[np.ndarray, np.ndarray]:
+                        time_ratio_dot: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
             Get leg tip's position and velocity at given time ratio.
 
@@ -357,6 +364,7 @@ class SwingTrjPlanner(object):
             Returns:
                 tip_pos (array(3)): tip position at given time ratio.
                 tip_vel (array(3)): tip velocity at given time ratio.
+                tip_acc (array(3)): tip acceleration at given time ratio.
         """
 
         pivot = 0.5 * (1 - math.cos(math.pi * time_ratio))
@@ -364,10 +372,13 @@ class SwingTrjPlanner(object):
         # add height curve
         tip_pos[2] += self.step_height * math.sin(math.pi * pivot)
 
-        pivotdot = 0.5 * math.sin(math.pi * time_ratio) * \
-            math.pi * time_ratio_dot
+        pivotdot = 0.5 * math.sin(math.pi * time_ratio) * math.pi * time_ratio_dot
         tip_vel = (self.end_point - self.start_point) * pivotdot
-        tip_vel[2] += self.step_height * \
-            math.cos(math.pi * pivot) * math.pi * pivotdot
+        tip_vel[2] += self.step_height * math.cos(math.pi * pivot) * math.pi * pivotdot
 
-        return tip_pos, tip_vel
+        pivotddot = 0.5 * (math.pi**2) * math.cos(math.pi*time_ratio) * (time_ratio_dot**2)
+        tip_acc = (self.end_point - self.start_point) * pivotddot
+        tip_acc[2] += self.step_height * math.cos(math.pi * pivot) * math.pi * pivotddot - \
+                      self.step_height * math.sin(math.pi * pivot) * (math.pi * pivotdot)**2
+
+        return tip_pos, tip_vel, tip_acc
