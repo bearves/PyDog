@@ -221,7 +221,7 @@ class FootholdPlanner(object):
 
             # finally, predict next foothold based on Raibert's law, with centrifugal compensation
             #
-            #  p_next = p_h + Tst/2*v_now + k*(v_des-v_now) + 1/2*sqrt(bh/g)*(v_now x omega_des_z)
+            #  p_next = p_h + Tst/2*v_now + k*(v_des-v_now) + 1/2*(bh/g)*(v_now x omega_des_z)
             #
             self.next_footholds[0+leg*3:2+leg*3] = \
                 self.hip_pos_wcs_next_td[0+leg*3:2+leg*3] + \
