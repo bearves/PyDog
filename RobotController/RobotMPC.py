@@ -11,7 +11,7 @@ class QuadConvexMPC(object):
     # MPC settings
     leap: int = 25                 # Solve MPC every (leap) simulating step
     dt: float = 1/1000.            # time step of the simulator
-    dt_mpc: float = dt * leap # MPC solving time interval
+    dt_mpc: float = dt * leap      # MPC solving time interval
     horizon_length: int = 20       # prediction horizon length of MPC
 
     # System config
@@ -58,14 +58,17 @@ class QuadConvexMPC(object):
     H    : np.ndarray = np.array([])
     G    : np.ndarray = np.array([])
 
-    def __init__(self, sim_dt: float):
+    def __init__(self, sim_dt: float, leap: int):
         """
             Create a model predictive controller for quadruped robot.
 
             Parameters:
-                sim_dt (float): time step of the simulator
+                sim_dt (float): time step of the simulator.
+                leap (int): leap time of the MPC, so that the controller 
+                    solves MPC every (leap) simulating step.
         """
         self.dt = sim_dt
+        self.leap = leap
         self.dt_mpc = sim_dt * self.leap
         self.invIb = np.linalg.inv(self.Ib)
 

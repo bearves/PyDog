@@ -4,13 +4,14 @@ import pybullet_data as pb_data
 from scipy.spatial.transform import Rotation as rot
 import matplotlib.pyplot as plt
 
-from RobotController import RobotGaitControl
+from RobotController import RobotGaitControl as rc
 from RobotController.RobotSteer import DirectionFlag
 
 np.set_printoptions(precision=4, suppress=True)
 
 # initialize the simulator parameters, GUI and others
 time_step = 1./1000.
+
 pb.connect(pb.GUI)
 pb.resetDebugVisualizerCamera(1, 180, -12, [0.0, -0.0, 0.2])
 pb.setTimeStep(time_step)
@@ -51,12 +52,14 @@ in_gait_start_time = 3.0
 in_gait = False
 
 # load controller
+leap = 25
 urdf_file = r'./models/a1/a2_pino.urdf'
 mesh_dir  = r'./models/a1/'
-gait_controller = RobotGaitControl.QuadGaitController(urdf_file, mesh_dir, use_mpc=True)
+gait_controller = rc.QuadGaitController(
+    time_step, leap, urdf_file, mesh_dir, use_mpc=True)
         
-feedbacks = RobotGaitControl.QuadControlInput()
-user_cmd = RobotGaitControl.QuadRobotCommands()
+feedbacks = rc.QuadControlInput()
+user_cmd = rc.QuadRobotCommands()
 
 # log
 log_size = 10000

@@ -43,14 +43,17 @@ class QuadSingleBodyVMC(object):
     G : np.ndarray = np.zeros(dim_u)
     C : np.ndarray = np.zeros((6, ))
 
-    def __init__(self, sim_dt: float):
+    def __init__(self, sim_dt: float, leap: int):
         """
             Create a virtual model controller based on single floating base dynamic for quadruped robot.
 
             Parameters:
-                sim_dt (float): time step of the simulator
+                sim_dt (float): time step of the simulator.
+                leap (int): leap time of the VMC, so that the controller 
+                    solves VMC every (leap) simulating step.
         """
         self.dt = sim_dt
+        self.leap = leap
         self.dt_vmc = sim_dt * self.leap
         self.invIb = np.linalg.inv(self.Ib)
 

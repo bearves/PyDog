@@ -57,6 +57,7 @@ class QuadGaitController(object):
     # control constants
     n_leg: int = 4
     dt: float = 1./1000.
+    leap: int = 25
     use_mpc: bool = True
 
     # gait pattern generator
@@ -103,17 +104,21 @@ class QuadGaitController(object):
     jnt_ref_trq_wbic:  np.ndarray
     jnt_ref_trq_final: np.ndarray
 
-    def __init__(self, urdf_file: str, mesh_dir: str, use_mpc: bool) -> None:
+    def __init__(self, dt: float, leap: int, urdf_file: str, mesh_dir: str, use_mpc: bool) -> None:
         """
             Create quadruped robot gait controller.
 
             Parameters:
+                dt (float): base time step of the simulator.
+                leap (int): the leap step of MPC/VMC, so that the controller solves MPC/VMC every (leap) dt.
                 urdf_file (str): path of the robot's urdf file.
                 mesh_dir (str): path of the parent directory to store the robot's mesh files.
                 use_mpc(bool): Set the controller to use MPC as body controller, otherwise a VMC is utilized.
         """
         # setup controller options
         self.use_mpc = use_mpc
+        self.dt = dt
+        self.leap = leap
 
         # setup gait generator
         self.stand_gait = GaitPatternGenerator(
@@ -144,9 +149,9 @@ class QuadGaitController(object):
             self.swing_traj_planner.append(SwingTrjPlanner())
 
         # setup controllers
-        self.mpc = QuadConvexMPC(self.dt)
+        self.mpc = QuadConvexMPC(self.dt, self.leap)
         self.mpc.cal_weight_matrices()
-        self.vmc = QuadSingleBodyVMC(self.dt)
+        self.vmc = QuadSingleBodyVMC(self.dt, self.leap)
         self.wbic = QuadWBIC()
 
         # setup robot steer
