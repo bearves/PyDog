@@ -31,10 +31,10 @@ class QuadStateEstimator(object):
     ssk: np.ndarray     # predicted measurements from states, that ssk = Hk * xik + vk, dim(ssk) = nm x 1
     yk: np.ndarray      # measurement residue that yk = sk - ssk, dim(yk) = nm x 1
     Hk: np.ndarray      # measurement matrix that ssk = Hk * xik + vk, dim(Hk) = nm x nis
-    Rk: np.ndarray      # covariance of the measurment noise, aka. COV(vk), dim(Rk) = nm x nm
+    Rk: np.ndarray      # covariance of the measurement noise, aka. COV(vk), dim(Rk) = nm x nm
 
     Kk: np.ndarray      # Kalman gain that dx = Kk * yk, dim(Kk) = nis x nm
-    dx: np.ndarray      # state corretion, that xik_est = xik_predict + dx, dim(dx) = nis x 1
+    dx: np.ndarray      # state correction, that xik_est = xik_predict + dx, dim(dx) = nis x 1
 
     # internal state place holders
     Ck: np.ndarray      # rotation matrix 3x3, mapping vector from WCS to BCS (for the compliance to the ETH's paper)
@@ -42,7 +42,7 @@ class QuadStateEstimator(object):
     fk: np.ndarray      # net acceleration in BCS, i.e. fk = fk_measure - acc_bias
 
     # useful constants
-    g: np.ndarray = np.array([0, 0, -9.81]) # gravititional acceleration
+    g: np.ndarray = np.array([0, 0, -9.81]) # gravitational acceleration
     I3: np.ndarray = np.eye(3)              # 3x3 Identity mat
     O3: np.ndarray = np.zeros(3)            # 3x3 Zero mat
 
