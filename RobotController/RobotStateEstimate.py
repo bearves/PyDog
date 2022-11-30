@@ -17,6 +17,16 @@ class QuadStateEstimator(object):
     nm:     int         # dimension of the measurement vector
     nl:     int         # dimension of tip pos vector, nl = n_legs * 3
 
+    # state and measurement covariances
+    Qf:     np.ndarray  # acceleration covariance
+    Qbf:    np.ndarray  # acceleration bias covariance
+    Qw:     np.ndarray  # gyro covariance
+    Qbw:    np.ndarray  # gyro bias covariance
+
+    Qpst:   np.ndarray  # tip position covariance at stance phase
+    Qpsw:   np.ndarray  # tip velocity covariance at swing phase
+
+
     # estimator states
     xk : np.ndarray     # estimating state at k moment, dim(xk) = ns x 1 
     Pk : np.ndarray     # estimating state covariance at k moment, dim(Pk) = nis x nis
@@ -169,7 +179,7 @@ class QuadStateEstimator(object):
         Qk[12+self.nl:15+self.nl, 12+self.nl:15+self.nl] = dt * self.Qbw
 
         for leg in range(self.n_legs):
-            Qp = np.eye(3) # TODO: adjusting according to the actual support state of each leg
+            Qp = self.get_tip_pos_cov(leg) # TODO: adjusting according to the actual support state of each leg
             Qk[9+leg*3:12+leg*3, 9+leg*3:12+leg*3] = dt * self.Ck.T @ Qp @ self.Ck
 
         self.Qk = Qk
