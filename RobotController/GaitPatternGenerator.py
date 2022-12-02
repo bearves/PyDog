@@ -142,7 +142,27 @@ class GaitPatternGenerator(object):
             swing_time_ratio_dot = 1/self.total_period/(1. - self.duty[leg])
             return swing_time_ratio, swing_time_ratio_dot
 
+    def get_current_support_time_ratio(self, leg: int) -> tuple[float, float]:
+        """
+            Get the current time ratio and its time derivative in the support phase for a leg.
+            This is useful for state estimator to adjust the covariance of leg tip position in the 
+            estimation model.
+
+            Parameters:
+                leg (int): the index of the leg.
+
+            Returns:
+                support_time_ratio (float): time ratio in the support phase.
+                support_time_ratio_dot (float): time derivative of the time ratio in the support phase. 
+        """
+        if self.phase[leg] > self.duty[leg]:
+            return 0, 0
+        else:
+            support_time_ratio = self.phase[leg]/self.duty[leg]
+            support_time_ratio_dot = 1/self.total_period/self.duty[leg]
+            return support_time_ratio, support_time_ratio_dot
     
+
     def get_swing_time_left(self) -> np.ndarray:
         """
             Get the time left in the swing phase for all legs.

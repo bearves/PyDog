@@ -48,6 +48,8 @@ class QuadControlOutput(object):
     n_leg: int = 4
     # control output
     joint_tgt_trq: np.ndarray = np.zeros(n_leg *3) # joint target torque command
+    support_state: np.ndarray = np.ones(n_leg)
+    support_phase: np.ndarray = np.zeros(n_leg)
 
 
 class QuadGaitController(object):
@@ -257,8 +259,13 @@ class QuadGaitController(object):
         # joint trq control
         self.joint_trq_control(feedbacks)
 
+        # set controller outputs
         output = QuadControlOutput()
         output.joint_tgt_trq = self.jnt_ref_trq_final
+        output.support_state = self.current_support_state
+        for leg in range(self.n_leg):
+            output.support_phase[leg] = \
+                self.current_gait.get_current_support_time_ratio(leg)[0]
 
         return output
 

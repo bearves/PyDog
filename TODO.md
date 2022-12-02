@@ -92,12 +92,24 @@
         - Reason: wrong set to WBIC's body ref orn 
 
 11. Change simulator and re-write simulation codes (DONE)
+    - Setup Webots simulator interface
+    - Setup accelerometer and gyro sensor
 
-12. Early/Late touchdown detection and reprogramming
+12.  Early/Late touchdown detection and reprogramming
     - For each leg, if always early/late touchdown, slowly adjust foothold height accordingly.
     - Sudden early touchdown, replan the leg trajectory.
 
-13. Terrain slope estimation and body adaption
+13.  Terrain slope estimation and body adaption
 
-14. Body state estimator
+14.  Body state estimator
+    - Implement ETH's state estimator 
+      - Extended Kalman Filter formulation
+    - Collect data for state estimation turning
+      - Measurements: time, accelerometer, gyro, joint pos, vel, trq, support state, phase of support state
+      - True data: body pos, vel, orn, angvel
+    - Turning
+      - Qbw, Qbf
+      - Qw, Qf
+      - Rs, Qpst, Qpsw
+    - Integrate state estimation to gait controller
 

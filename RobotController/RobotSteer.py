@@ -29,7 +29,7 @@ class RobotSteer(object):
     df_2_vc_action: list[float] = [1, -1, 1, -1, 1, -1] 
 
     # velocity command is defined as [v_x, v_y, thetadot_z], representing a planar movement
-    max_vel_cmd:            np.ndarray = np.array([1.5, 0.4, 2.5]) # maximum velocity
+    max_vel_cmd:            np.ndarray = np.array([2.0, 0.4, 2.5]) # maximum velocity
     vel_cmd_local:          np.ndarray = np.zeros(3)             # local velocity command
     vel_cmd_local_filtered: np.ndarray = np.zeros(3)             # filtered local velocity command
     vel_cmd_wcs:            np.ndarray = np.zeros(3)             # velocity command in WCS
