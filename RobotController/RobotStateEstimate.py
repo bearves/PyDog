@@ -165,9 +165,6 @@ class QuadStateEstimator(object):
         self.Ck = rot.from_quat(qk).as_matrix()
         rkp1 = rk + dt * vk + 0.5 * d2t * self.ak
         vkp1 = vk + dt * self.ak
-        print(qk)
-        print(self.wk)
-        print(so3_to_quat(dt * self.wk))
         qkp1 = quat_prod(so3_to_quat(dt * self.wk), qk)
 
         self.xkp1 = self.xk.copy()
@@ -243,7 +240,6 @@ class QuadStateEstimator(object):
 
         # Update Rk
         Rk = np.zeros((self.nm, self.nm))
-        print(Rk)
         for leg in range(self.n_legs):
             idx = range(0+leg*3, 3+leg*3)
             Rk[idx, 0+leg*3:3+leg*3] = self.Rs

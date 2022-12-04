@@ -3,4 +3,5 @@
 Papers
 *.pyi
 *.pyc
+*.csv
 __pycache__
