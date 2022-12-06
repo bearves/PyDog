@@ -50,6 +50,7 @@ class QuadStateEstimator(object):
 
     # internal state place holders
     Ck: np.ndarray      # rotation matrix 3x3, mapping vector from WCS to BCS (for the compliance to the ETH's paper)
+    Ckp1: np.ndarray    # predicted rotation matrix 3x3
     ak: np.ndarray      # absolute acceleration in WCS, i.e. ak = Ck.T (fk_measure - acc_bias) + g
     fk: np.ndarray      # net acceleration in BCS, i.e. fk = fk_measure - acc_bias
 
@@ -81,14 +82,14 @@ class QuadStateEstimator(object):
 
         # setup state and measurement covariance parameters
         self.Qf = 1e-2 * np.eye(3)
-        self.Qbf = 1e-2 * np.eye(3)
+        self.Qbf = 1e-6 * np.eye(3)
         self.Qw = 1e-2 * np.eye(3)
-        self.Qbw = 1e-2 * np.eye(3)
+        self.Qbw = 1e-6 * np.eye(3)
 
-        self.Qpst = 1e-2 * np.eye(3)
-        self.Qpsw = 1e10 * np.eye(3)
+        self.Qpst = 1e-1 * np.eye(3)
+        self.Qpsw = 1e30 * np.eye(3)
 
-        self.Rs = 1e-6 * np.eye(3)
+        self.Rs = 1e-8 * np.eye(3)
 
         # create kinematic model
         self.kin_model = rkin.RobotKineticModel()
@@ -103,11 +104,11 @@ class QuadStateEstimator(object):
             Reset robot state.
         """
         self.kin_model.update(body_pos, body_orn, body_vel, np.zeros(3), jnt_pos, 0 * jnt_pos)
-        tip_pos_wcs, tip_vel_wcs = self.kin_model.get_tip_state_world()
+        tip_pos_wcs, tip_vel_wcs = self.kin_model.get_tip_state_body()
 
         self.xk[0:3] = body_pos
         self.xk[3:6] = body_vel
-        self.xk[6:10] = body_orn
+        self.xk[6:10] = quat_inv(body_orn)
         self.xk[10:10+self.nl] = tip_pos_wcs
         self.xk[10+self.nl:13+self.nl] = np.zeros(3)
         self.xk[13+self.nl:16+self.nl] = np.zeros(3)
@@ -121,18 +122,20 @@ class QuadStateEstimator(object):
                jnt_act_pos: np.ndarray, 
                jnt_act_vel: np.ndarray, 
                jnt_act_trq: np.ndarray, 
-               support_state: np.ndarray):
+               support_state: np.ndarray,
+               support_phase: np.ndarray):
         
         # calculate leg kinematics for measurement error
         self.update_kinetic_model(jnt_act_pos, jnt_act_vel)
         # predict next state: xk+1_pred = pred(xk)
         self.state_predict(body_ang_vel, body_lin_acc)
         # update matrices of Kalman filter Fk, Qk, Hk, Rk
-        self.update_matrices(jnt_act_trq, support_state)
+        self.update_matrices(jnt_act_trq, support_state, support_phase)
         # calculate Kalman gains and adjustment dx
         self.estimate()
         # correct next state: xk+1_est = xk+1_pred + dx
         self.state_correct()
+
 
     def update_kinetic_model(self, 
                              jnt_act_pos: np.ndarray,
@@ -162,7 +165,6 @@ class QuadStateEstimator(object):
 
         self.Ck = rot.from_quat(self.xk[6:10]).as_matrix()
         self.ak = self.Ck.T @ self.fk + self.g
-        self.Ck = rot.from_quat(qk).as_matrix()
         rkp1 = rk + dt * vk + 0.5 * d2t * self.ak
         vkp1 = vk + dt * self.ak
         qkp1 = quat_prod(so3_to_quat(dt * self.wk), qk)
@@ -175,7 +177,8 @@ class QuadStateEstimator(object):
 
     def update_matrices(self, 
                         jnt_act_trq: np.ndarray,
-                        support_state: np.ndarray):
+                        support_state: np.ndarray,
+                        support_phase: np.ndarray):
         # Update Fk
         dt = self.dt
         d2t = dt**2
@@ -218,24 +221,25 @@ class QuadStateEstimator(object):
         Qk[12+self.nl:15+self.nl, 12+self.nl:15+self.nl] = dt * self.Qbw
 
         for leg in range(self.n_legs):
-            Qp = self.get_tip_pos_cov(leg, jnt_act_trq, support_state)
+            Qp = self.get_tip_pos_cov(leg, jnt_act_trq, support_state, support_phase)
             Qk[9+leg*3:12+leg*3, 9+leg*3:12+leg*3] = dt * self.Ck.T @ Qp @ self.Ck
 
         self.Qk = Qk.copy()
 
         # Update yk
         self.ssk = np.zeros(self.nm) # measurement vector
+        self.Ckp1 = rot.from_quat(self.xkp1[6:10]).as_matrix()
         for leg in range(self.n_legs):
-            self.ssk[0+leg*3:3+leg*3] = self.Ck @ (self.xk[9+leg*3:12+leg*3] - self.xk[0:3])
+            self.ssk[0+leg*3:3+leg*3] = self.Ckp1 @ (self.xkp1[10+leg*3:13+leg*3] - self.xkp1[0:3])
         self.yk = self.sk - self.ssk # innovation vector
 
         # Update Hk
         Hk = np.zeros((self.nm, self.nis))
         for leg in range(self.n_legs):
             idx = range(0+leg*3, 3+leg*3)
-            Hk[idx, 0:3] = -self.Ck
+            Hk[idx, 0:3] = -self.Ckp1
             Hk[idx, 6:9] = skew(self.ssk[idx])
-            Hk[idx, 9+leg*3:12+leg*3] = self.Ck
+            Hk[idx, 9+leg*3:12+leg*3] = self.Ckp1
         self.Hk = Hk.copy()
 
         # Update Rk
@@ -248,6 +252,7 @@ class QuadStateEstimator(object):
 
     def estimate(self):
         Pkp1 = self.Fk @ self.Pk @ self.Fk.T + self.Qk          # dim(Pkp1) = nis x nis
+        
         Sk = self.Hk @ Pkp1 @ self.Hk.T + self.Rk               # dim(Sk) = nm x nm
         self.Kk = Pkp1 @ self.Hk.T @ np.linalg.inv(Sk)          # dim(Kk) = nis x nm
         self.dx = self.Kk @ self.yk                             # dim(dx) = nis x 1
@@ -258,7 +263,8 @@ class QuadStateEstimator(object):
         self.xk = self.xkp1.copy()
         self.xk[0:6] += self.dx[0:6]
         self.xk[6:10] = quat_prod(so3_to_quat(self.dx[6:9]), self.xkp1[6:10])
-        self.xk[10:self.ns] += self.dx[9:self.nis]
+        self.xk[10:10+self.nl] += self.dx[9:9+self.nl]
+        self.xk[10+self.nl:] += self.dx[9+self.nl:]
 
 
     def get_results(self) -> np.ndarray:
@@ -268,11 +274,28 @@ class QuadStateEstimator(object):
     def get_tip_pos_cov(self, 
                         leg_id: int, 
                         jnt_act_trq: np.ndarray,
-                        support_state: np.ndarray):
-        if (support_state[leg_id] > 0.7):
-            return self.Qpst
-        else:
-            return self.Qpsw
+                        support_state: np.ndarray,
+                        support_phase: np.ndarray):
+        trust = 0.0
+        stage1 = 0.05
+        stage2 = 0.25
+        gap = stage2 - stage1
+        
+        if (support_state[leg_id] < 0.7):
+            trust = 0 # swing
+        else: # stance phase
+            if (support_phase[leg_id] < stage1 or support_phase[leg_id] > 1-stage1):
+                trust = 0.0
+            elif (support_phase[leg_id] > stage2 and support_phase[leg_id] < 1-stage2):
+                trust = 1.0
+            elif (support_phase[leg_id] >= stage1 and support_phase[leg_id] <= stage2):
+                trust = (support_phase[leg_id] - stage1)/gap
+            elif (support_phase[leg_id] <= 1-stage1 and support_phase[leg_id] >= 1-stage2):
+                trust = (1 - stage1 - support_phase[leg_id])/gap
+            else:
+                trust = 0.0
+        return self.Qpst * trust + self.Qpsw * (1-trust)
+
 
 
 ###########################################
@@ -307,10 +330,16 @@ def quat_prod(q1, q2):
     return q
 
 
+def quat_inv(q):
+    qinv = q.copy()
+    qinv[0:3] *= -1.
+    return qinv
+
+
 def so3_to_quat(so3):
     n = np.linalg.norm(so3)
     q = np.zeros(4)
-    q[0:3] = math.sin(0.5*n) / n * so3
+    q[0:3] = -math.sin(0.5*n) / n * so3 # why neg?
     q[3] = math.cos(0.5*n)
     return q
 
