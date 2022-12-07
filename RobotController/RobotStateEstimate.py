@@ -167,7 +167,7 @@ class QuadStateEstimator(object):
         self.ak = self.Ck.T @ self.fk + self.g
         rkp1 = rk + dt * vk + 0.5 * d2t * self.ak
         vkp1 = vk + dt * self.ak
-        qkp1 = quat_prod(so3_to_quat(dt * self.wk), qk)
+        qkp1 = quat_prod(so3_to_quat(dt * -self.wk), qk)
 
         self.xkp1 = self.xk.copy()
         self.xkp1[0:3] = rkp1
@@ -262,7 +262,7 @@ class QuadStateEstimator(object):
     def state_correct(self):
         self.xk = self.xkp1.copy()
         self.xk[0:6] += self.dx[0:6]
-        self.xk[6:10] = quat_prod(so3_to_quat(self.dx[6:9]), self.xkp1[6:10])
+        self.xk[6:10] = quat_prod(so3_to_quat(-self.dx[6:9]), self.xkp1[6:10])
         self.xk[10:10+self.nl] += self.dx[9:9+self.nl]
         self.xk[10+self.nl:] += self.dx[9+self.nl:]
 
@@ -339,7 +339,7 @@ def quat_inv(q):
 def so3_to_quat(so3):
     n = np.linalg.norm(so3)
     q = np.zeros(4)
-    q[0:3] = -math.sin(0.5*n) / n * so3 # why neg?
+    q[0:3] = math.sin(0.5*n) / n * so3 # why neg?
     q[3] = math.cos(0.5*n)
     return q
 

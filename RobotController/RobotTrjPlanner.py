@@ -75,8 +75,11 @@ class BodyTrjPlanner(object):
         self.ref_body_angvel[2] = self.vel_cmd[2]
 
         # correct drift in Yaw, and keep Roll/Pitch zero at current stage
+        # pitch and roll will be set for terrain slope estimation in the future
         yaw = rot.from_quat(act_body_orn).as_euler('ZYX')[0]
-        self.ref_body_orn = rot.from_rotvec([0,0,yaw]).as_quat()
+        pitch_0 = 0
+        roll_0 = 0
+        self.ref_body_orn = rot.from_euler('ZYX', [yaw,pitch_0,roll_0]).as_quat()
 
 
     def predict_future_body_ref_traj(self,
@@ -91,15 +94,15 @@ class BodyTrjPlanner(object):
         """
 
         # get body euler angle from quaternion
-        body_euler_ypr = rot.from_quat(self.ref_body_orn).as_euler('ZYX')
-        body_euler_rpy = np.flip(body_euler_ypr)
+        body_ypr = rot.from_quat(self.ref_body_orn).as_euler('ZYX')
+        body_rpy = np.flip(body_ypr)
         yawdot = self.ref_body_angvel[2]
 
         # body state q = [theta p w v g]' \in R(13)
         future_body_traj = np.zeros((horizon_length, 13))
         for i in range(horizon_length):
             # theta ( roll, pitch, yaw )
-            future_body_traj[i, 0:3] = [0, 0, body_euler_rpy[2] + yawdot * dt_mpc * i]
+            future_body_traj[i, 0:3] = [body_rpy[0], body_rpy[1], body_rpy[2] + yawdot * dt_mpc * i]
             future_body_traj[i, 3:6] = self.ref_body_pos + self.ref_body_vel * dt_mpc * i  # x, y, z
             future_body_traj[i, 6:9] = [0, 0, yawdot]  # wx, wy, wz
             future_body_traj[i, 9:12] = self.ref_body_vel  # vx, vy, vz

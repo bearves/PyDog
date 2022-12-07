@@ -22,8 +22,25 @@ jnt_pos = np.array([-0.0, 0.75, -1.3,
                     -0.0, 0.75, -1.3,
                     -0.0, 0.75, -1.3])
 est = rse.QuadStateEstimator(0.001)
-est.reset_state(np.array([0, 0, 1]), np.zeros(3), np.array([0,0,0,1]), jnt_pos)
+est.reset_state(np.array([0, 0, 1.]), np.zeros(3), np.array([0,0,0,1.]), jnt_pos)
 
-est.update(np.array([0, 0, 0.1]), np.array([1, 2, -9.8]), jnt_pos, 0 * jnt_pos, 0 * jnt_pos, np.array([0,1,1,0]))
+est.update(np.array([0, 0, 0.1]), 
+           np.array([1, 2, -9.8]), 
+           jnt_pos, 
+           0 * jnt_pos, 
+           0 * jnt_pos, 
+           np.array([0,1,1,0]), 
+           np.array([0, 0.5, 0.5, 0]))
 
 print(est.get_results())
+
+w = np.array([0, 0, 10.])
+q0 = np.array([0, 0, 0, 1.])
+dt = 0.1
+dq = rse.so3_to_quat(w * dt)
+print(dq)
+q1 = rse.quat_prod(dq, q0)
+print(q1)
+rpy_q1 = rot.from_quat(q1).as_euler('ZYX')
+print(rpy_q1)
+print(rot.from_matrix(rse.gamma0(w, dt)).as_euler('ZYX'))
