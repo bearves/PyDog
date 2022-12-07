@@ -82,14 +82,14 @@ class QuadStateEstimator(object):
 
         # setup state and measurement covariance parameters
         self.Qf = 1e-2 * np.eye(3)
-        self.Qbf = 1e-6 * np.eye(3)
+        self.Qbf = 1e-2 * np.eye(3)
         self.Qw = 1e-2 * np.eye(3)
-        self.Qbw = 1e-6 * np.eye(3)
+        self.Qbw = 1e-2 * np.eye(3)
 
         self.Qpst = 1e-1 * np.eye(3)
         self.Qpsw = 1e30 * np.eye(3)
 
-        self.Rs = 1e-8 * np.eye(3)
+        self.Rs = 1e-6 * np.eye(3)
 
         # create kinematic model
         self.kin_model = rkin.RobotKineticModel()
@@ -252,9 +252,9 @@ class QuadStateEstimator(object):
 
     def estimate(self):
         Pkp1 = self.Fk @ self.Pk @ self.Fk.T + self.Qk          # dim(Pkp1) = nis x nis
-        
         Sk = self.Hk @ Pkp1 @ self.Hk.T + self.Rk               # dim(Sk) = nm x nm
-        self.Kk = Pkp1 @ self.Hk.T @ np.linalg.inv(Sk)          # dim(Kk) = nis x nm
+        invSk = np.linalg.inv(Sk)
+        self.Kk = Pkp1 @ self.Hk.T @ invSk                      # dim(Kk) = nis x nm
         self.dx = self.Kk @ self.yk                             # dim(dx) = nis x 1
         self.Pk = (np.eye(self.nis) - self.Kk @ self.Hk) @ Pkp1 # dim(Pk) = nis x nis
 
