@@ -77,8 +77,8 @@ class BodyTrjPlanner(object):
         # correct drift in Yaw, and keep Roll/Pitch zero at current stage
         # pitch and roll will be set for terrain slope estimation in the future
         yaw = rot.from_quat(act_body_orn).as_euler('ZYX')[0]
-        pitch_0 = 0
-        roll_0 = 0
+        pitch_0 = 0.2
+        roll_0 = -0.2
         self.ref_body_orn = rot.from_euler('ZYX', [yaw,pitch_0,roll_0]).as_quat()
 
 

@@ -7,6 +7,7 @@ class QuadStateEstimator(object):
 
     """
         Implementation of a EKF-based state estimator for quadruped robot.
+        This implementation is derived from ETH's paper (Micheal Bloesch, et. al, 2013)
     """
 
     # basic params
@@ -64,6 +65,12 @@ class QuadStateEstimator(object):
 
     
     def __init__(self, dt: float) -> None:
+        """
+            Initialize the state estimator and setup covariances of signals and states.
+
+            Parameters:
+                dt (float): the time step of each estimation run.
+        """
         
         self.dt = dt
         # state definition:
@@ -101,34 +108,55 @@ class QuadStateEstimator(object):
                     body_orn: np.ndarray,
                     jnt_pos: np.ndarray):
         """
-            Reset robot state.
+            Reset robot state as the initial estimation.
+            
+            Parameters:
+                body_pos (array(3)): initial body position in WCS.
+                body_vel (array(3)): initial body velocity in WCS.
+                body_orn (array(4)): initial body orientation in WCS, expressed in quaternion.
+                jnt_pos  (array(n_legs*3)): initial joint position.
         """
+        # get initial tip position from FK
         self.kin_model.update(body_pos, body_orn, body_vel, np.zeros(3), jnt_pos, 0 * jnt_pos)
         tip_pos_wcs, tip_vel_wcs = self.kin_model.get_tip_state_body()
 
-        self.xk[0:3] = body_pos
-        self.xk[3:6] = body_vel
-        self.xk[6:10] = quat_inv(body_orn)
-        self.xk[10:10+self.nl] = tip_pos_wcs
-        self.xk[10+self.nl:13+self.nl] = np.zeros(3)
-        self.xk[13+self.nl:16+self.nl] = np.zeros(3)
+        self.xk[0:3] = body_pos             # p in WCS
+        self.xk[3:6] = body_vel             # v in WCS
+        self.xk[6:10] = quat_inv(body_orn)  # in ETH paper, q from WCS to BCS is used
+        self.xk[10:10+self.nl] = tip_pos_wcs # p_tip in WCS
+        self.xk[10+self.nl:13+self.nl] = np.zeros(3)  # acc_bias in BCS
+        self.xk[13+self.nl:16+self.nl] = np.zeros(3)  # gyro_bias in BCS
 
-        self.Pk = np.zeros((self.nis, self.nis))
+        self.Pk = 1e-16 * np.eye(self.nis)  # set initial covariance matrix 
 
 
     def update(self, 
-               body_ang_vel: np.ndarray, 
-               body_lin_acc: np.ndarray, 
+               body_gyr_bcs: np.ndarray, 
+               body_acc_bcs: np.ndarray, 
                jnt_act_pos: np.ndarray, 
                jnt_act_vel: np.ndarray, 
                jnt_act_trq: np.ndarray, 
                support_state: np.ndarray,
                support_phase: np.ndarray):
+        """
+            Update and estimate robot states.
+
+            Parameters:
+                body_gyr_bcs (array(3)): body angular velocity, in BCS
+                body_acc_bcs (array(3)): body linear acceleration, in BCS.
+                jnt_act_pos (array(n_legs*3)): actual position of joints.
+                jnt_act_vel (array(n_legs*3)): actual velocity of joints.
+                jnt_act_trq (array(n_legs*3)): actual torque of joints.
+                support_state (array(n_legs)): the supporting state of all legs.
+                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                                            for each leg, phase is a 0-1 scalar, that 
+                                            phase=0 at touchdown, phase=1 at lifting up.
+        """
         
         # calculate leg kinematics for measurement error
         self.update_kinetic_model(jnt_act_pos, jnt_act_vel)
         # predict next state: xk+1_pred = pred(xk)
-        self.state_predict(body_ang_vel, body_lin_acc)
+        self.state_predict(body_gyr_bcs, body_acc_bcs)
         # update matrices of Kalman filter Fk, Qk, Hk, Rk
         self.update_matrices(jnt_act_trq, support_state, support_phase)
         # calculate Kalman gains and adjustment dx
@@ -140,8 +168,15 @@ class QuadStateEstimator(object):
     def update_kinetic_model(self, 
                              jnt_act_pos: np.ndarray,
                              jnt_act_vel: np.ndarray):
+        """
+            Update kinetic model and get leg kinetic measurements, i.e. sk.
 
-        # update kinetic model, note that we just use leg forword kinetics in BODY cs,
+            Parameters:
+                jnt_act_pos (array(n_legs*3)): actual position of joints.
+                jnt_act_vel (array(n_legs*3)): actual velocity of joints.
+        """
+
+        # update kinetic model, note that we just use leg forward kinetics in BODY cs,
         # thus the body states are not passed to the kinetic model
         self.kin_model.update(np.zeros(3), np.array([0, 0, 0, 1]),
                               np.zeros(3), np.zeros(3),
@@ -150,8 +185,16 @@ class QuadStateEstimator(object):
         self.sk = tip_pos_wrt_body
 
 
-    def state_predict(self, body_ang_vel, body_lin_acc):
+    def state_predict(self, 
+                      body_gyr_bcs: np.ndarray, 
+                      body_acc_bcs: np.ndarray):
+        """
+            Predict x_k+1 using system model.
 
+            Parameters:
+                body_gyr_bcs (array(3)): body angular velocity, in BCS
+                body_acc_bcs (array(3)): body linear acceleration, in BCS.
+        """
         dt = self.dt
         d2t = self.dt**2
         rk = self.xk[0:3]
@@ -160,13 +203,15 @@ class QuadStateEstimator(object):
         bfk = self.xk[10+self.nl:13+self.nl]
         bwk = self.xk[13+self.nl:16+self.nl]
 
-        self.fk = body_lin_acc - bfk
-        self.wk = body_ang_vel - bwk
+        self.fk = body_acc_bcs - bfk
+        self.wk = body_gyr_bcs - bwk
 
         self.Ck = rot.from_quat(self.xk[6:10]).as_matrix()
         self.ak = self.Ck.T @ self.fk + self.g
         rkp1 = rk + dt * vk + 0.5 * d2t * self.ak
         vkp1 = vk + dt * self.ak
+        # special updating for rotations. 
+        # (NOTE: THe ETH's paper may have a bug here, after test, wk should be -wk )
         qkp1 = quat_prod(so3_to_quat(dt * -self.wk), qk)
 
         self.xkp1 = self.xk.copy()
@@ -179,6 +224,16 @@ class QuadStateEstimator(object):
                         jnt_act_trq: np.ndarray,
                         support_state: np.ndarray,
                         support_phase: np.ndarray):
+        """
+            Update Fk, Qk, Hk, and Rk for EKF estimation. See ETH's paper for details.
+
+            Parameters:
+                jnt_act_trq (array(n_legs*3)): the joint actual torque of all legs.
+                support_state (array(n_legs)): the supporting state of all legs.
+                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                                            for each leg, phase is a 0-1 scalar, that 
+                                            phase=0 at touchdown, phase=1 at lifting up.
+        """
         # Update Fk
         dt = self.dt
         d2t = dt**2
@@ -251,6 +306,10 @@ class QuadStateEstimator(object):
 
 
     def estimate(self):
+        """
+            Do estimation using the Extended-Kalman filter.
+            The Kalman gain Kk, correcting vector dx and state covariance Pk is updated. 
+        """
         Pkp1 = self.Fk @ self.Pk @ self.Fk.T + self.Qk          # dim(Pkp1) = nis x nis
         Sk = self.Hk @ Pkp1 @ self.Hk.T + self.Rk               # dim(Sk) = nm x nm
         invSk = np.linalg.inv(Sk)
@@ -260,14 +319,26 @@ class QuadStateEstimator(object):
 
 
     def state_correct(self):
+        """
+            Correct the robot state x using the correcting vector dx.
+            dx is calculated by the estimate() function.
+        """
         self.xk = self.xkp1.copy()
         self.xk[0:6] += self.dx[0:6]
+        # special updating for rotations. 
+        # (NOTE: THe ETH's paper may have a bug here, after test, dx[6:9] should be -dx[6:9] )
         self.xk[6:10] = quat_prod(so3_to_quat(-self.dx[6:9]), self.xkp1[6:10])
         self.xk[10:10+self.nl] += self.dx[9:9+self.nl]
         self.xk[10+self.nl:] += self.dx[9+self.nl:]
 
 
     def get_results(self) -> np.ndarray:
+        """
+            Get the estimated results.
+
+            Returns:
+                xk (array(ns)): the estimated robot state.
+        """
         return self.xk.copy()
 
 
@@ -275,7 +346,27 @@ class QuadStateEstimator(object):
                         leg_id: int, 
                         jnt_act_trq: np.ndarray,
                         support_state: np.ndarray,
-                        support_phase: np.ndarray):
+                        support_phase: np.ndarray) -> np.ndarray:
+        """
+            Get the covariance matrix Qp of the tip position state.
+            Qp is varying according to the contact status.
+            If the leg is in contact with the ground, its tip position covariance is low,
+            the estimator believes the leg tip should be stay at its original position,
+            otherwise its position covariance is very high and the estimator believes the 
+            leg tip position should be corrected by the leg kinetic measurements.
+
+            Parameters:
+                leg_id (int): the index of leg.
+                jnt_act_trq (array(n_legs*3)): the joint actual torque of all legs.
+                support_state (array(n_legs)): the supporting state of all legs.
+                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                                            for each leg, phase is a 0-1 scalar, that 
+                                            phase=0 at touchdown, phase=1 at lifting up.
+            
+            Returns:
+                Qp (array(3,3)): the position covariance of the given leg's tip.
+
+        """
         trust = 0.0
         stage1 = 0.05
         stage2 = 0.25
@@ -319,7 +410,17 @@ def skew(vec: np.ndarray) -> np.ndarray:
     return vec_skew
 
 
-def quat_prod(q1, q2):
+def quat_prod(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+    """
+        Get the quaternion product of two quaternions, i.e. q = q1 * q2
+
+        Parameters:
+            q1 (array(4)): the first quaternion.
+            q2 (array(4)): the second quaternion.
+        
+        Returns:
+            q  (array(4)): the product of q1 and q2.
+    """
     s1 = q1[3]
     s2 = q2[3]
     v1 = q1[0:3]
@@ -330,21 +431,50 @@ def quat_prod(q1, q2):
     return q
 
 
-def quat_inv(q):
+def quat_inv(q: np.ndarray) -> np.ndarray:
+    """
+        Get the inverse quaternion of a quaternion, that qinv * q = [0,0,0,1]
+
+        Parameters:
+            q (array(4)): the quaternion.
+        
+        Returns:
+            qinv  (array(4)): the inverse of q.
+    """
     qinv = q.copy()
     qinv[0:3] *= -1.
     return qinv
 
 
-def so3_to_quat(so3):
+def so3_to_quat(so3: np.ndarray) -> np.ndarray:
+    """
+        Get the quaternion form of the exponential of a so3 vector, i.e. q = exp(so3).  
+
+        Parameters:
+            so3 (array(3)): the so3 vector.
+        
+        Returns:
+            q (array(4)): the quaternion.
+    """
     n = np.linalg.norm(so3)
     q = np.zeros(4)
-    q[0:3] = math.sin(0.5*n) / n * so3 # why neg?
+    q[0:3] = math.sin(0.5*n) / n * so3 
     q[3] = math.cos(0.5*n)
     return q
 
 
-def gamma0(w, dt):
+def gamma0(w: np.ndarray, dt: float) -> np.ndarray:
+    """
+        Get the gamma0 matrix from a small rotation. (see ETH's paper for definition).
+        Here the Rodrigues' formula is adopted to get a closed-form solution.
+
+        Parameters:
+            w (array(3)): angular velocity.
+            dt (float): time interval
+        
+        Returns:
+            gamma (array(3,3)): the gamma0 matrix.
+    """
     th = np.linalg.norm(w)
     wn = 1/th * w
     wnx = skew(wn)
@@ -355,7 +485,18 @@ def gamma0(w, dt):
     return gamma
 
 
-def gamma1(w, dt):
+def gamma1(w: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """
+        Get the gamma1 matrix from a small rotation. (see ETH's paper for definition).
+        Here the Rodrigues' formula is adopted to get a closed-form solution. 
+
+        Parameters:
+            w (array(3)): angular velocity.
+            dt (float): time interval
+        
+        Returns:
+            gamma (array(3,3)): the gamma1 matrix.
+    """
     th = np.linalg.norm(w)
     wn = 1/th * w
     wnx = skew(wn)
@@ -365,7 +506,18 @@ def gamma1(w, dt):
     return gamma
 
 
-def gamma2(w, dt):
+def gamma2(w: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """
+        Get the gamma2 matrix from a small rotation. (see ETH's paper for definition).
+        Here the Rodrigues' formula is adopted to get a closed-form solution.
+
+        Parameters:
+            w (array(3)): angular velocity.
+            dt (float): time interval
+        
+        Returns:
+            gamma (array(3,3)): the gamma2 matrix.
+    """
     th = np.linalg.norm(w)
     wn = 1/th * w
     wnx = skew(wn)
@@ -374,7 +526,19 @@ def gamma2(w, dt):
             (math.cos(th*dt) - 1. + 1./2. * dt**2 * th**2) / (th**2) * (wnx @ wnx)
     return gamma
 
-def gamma3(w, dt):
+
+def gamma3(w: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """
+        Get the gamma3 matrix from a small rotation. (see ETH's paper for definition).
+        Here the Rodrigues' formula is adopted to get a closed-form solution.
+
+        Parameters:
+            w (array(3)): angular velocity.
+            dt (float): time interval
+        
+        Returns:
+            gamma (array(3,3)): the gamma3 matrix.
+    """
     th = np.linalg.norm(w)
     wn = 1/th * w
     wnx = skew(wn)
