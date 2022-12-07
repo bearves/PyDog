@@ -13,7 +13,7 @@ This project is a simplified python implementation for quadruped robot simulatio
     - Python 3.9+
     - Pinocchio dynamic library
     - Pybullet simulator
-    - Numpy, scipy, matplotlib
+    - numpy, scipy, matplotlib
     - qpsolvers
 
 ## Usage
@@ -46,6 +46,10 @@ J. Di Carlo, P. M. Wensing, and S. Kim. MIT Cheetah 3: Design and Control of a R
 
 [5] B. Nemec and L. Zlajpah, Null space velocity control with dynamically consistent pseudo-inverse.
 
-[6] [Unitree A1 Dog model](https://github.com/unitreerobotics/unitree_pybullet)
+[6] M. Bloesch, M. Hutter, M. A. Hoepflinger, S. Leutenegger, C. Gehring, C. D. Remy and R. Siegwart, State Estimation for Legged Robots - Consistent Fusion of Leg Kinematics and IMU
 
-[7] [The Pinocchio dynamic library](https://github.com/stack-of-tasks/pinocchio)
+[7] [MIT Cheetah Software](https://github.com/mit-biomimetics/Cheetah-Software)
+
+[8] [Unitree A1 Dog model](https://github.com/unitreerobotics/unitree_pybullet)
+
+[9] [The Pinocchio dynamic library](https://github.com/stack-of-tasks/pinocchio)

@@ -99,17 +99,20 @@
     - For each leg, if always early/late touchdown, slowly adjust foothold height accordingly.
     - Sudden early touchdown, replan the leg trajectory.
 
-13.  Terrain slope estimation and body adaption
 
-14.  Body state estimator
-    - Implement ETH's state estimator 
-      - Extended Kalman Filter formulation
-    - Collect data for state estimation turning
+13.  Body state estimator
+    - Implement ETH's state estimator (DONE)
+      - Extended Kalman Filter formulation(DONE)
+    - Collect data for state estimation turning(DONE)
       - Measurements: time, accelerometer, gyro, joint pos, vel, trq, support state, phase of support state
       - True data: body pos, vel, orn, angvel
-    - Turning
+    - Turning(DONE)
       - Qbw, Qbf
       - Qw, Qf
       - Rs, Qpst, Qpsw
-    - Integrate state estimation to gait controller
+    - Integrate state estimation to gait controller (Ongoing)
+      - Modify foothold height according to body state and ground height
+
+
+14.  Terrain slope estimation and body adaption
 
