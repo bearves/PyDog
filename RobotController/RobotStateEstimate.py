@@ -12,11 +12,11 @@ class QuadStateEstimator(object):
 
     # basic params
     dt:     float       # time step of the simulator
-    n_legs: int = 4     # number of robot legs
+    n_leg:  int = 4     # number of robot legs
     ns:     int         # dimension of the estimating state
     nis:    int         # independent dimension of the estimating state
     nm:     int         # dimension of the measurement vector
-    nl:     int         # dimension of tip pos vector, nl = n_legs * 3
+    nl:     int         # dimension of tip pos vector, nl = n_leg * 3
 
     # state and measurement covariances
     Qf:     np.ndarray  # acceleration covariance, 3x3
@@ -78,14 +78,14 @@ class QuadStateEstimator(object):
         # NOTE: body_pos, body_vel, tip_pos_i in WCS,
         #       body_orn in Body CS, mapping vector from WCS to BCS (for the compliance to the ETH's paper)
         #       acc_bias and gyro_bias in Body CS
-        self.ns = 3+3+4+3*self.n_legs+3+3
+        self.ns = 3+3+4+3*self.n_leg+3+3
         self.nis = self.ns - 1 # dim of body orientation = 4, independent dim of body orientation = 3 
         self.xk = np.zeros(self.ns)
 
         # measurement definition
         # sk = [rel_tip_pos1, rel_tip_pos2, ..., rel_tip_posN]
-        self.nm = 3 * self.n_legs
-        self.nl = 3 * self.n_legs
+        self.nm = 3 * self.n_leg
+        self.nl = 3 * self.n_leg
 
         # setup state and measurement covariance parameters
         self.Qf = 1e-2 * np.eye(3)
@@ -114,7 +114,7 @@ class QuadStateEstimator(object):
                 body_pos (array(3)): initial body position in WCS.
                 body_vel (array(3)): initial body velocity in WCS.
                 body_orn (array(4)): initial body orientation in WCS, expressed in quaternion.
-                jnt_pos  (array(n_legs*3)): initial joint position.
+                jnt_pos  (array(n_leg*3)): initial joint position.
         """
         # get initial tip position from FK
         self.kin_model.update(body_pos, body_orn, body_vel, np.zeros(3), jnt_pos, 0 * jnt_pos)
@@ -144,11 +144,11 @@ class QuadStateEstimator(object):
             Parameters:
                 body_gyr_bcs (array(3)): body angular velocity, in BCS
                 body_acc_bcs (array(3)): body linear acceleration, in BCS.
-                jnt_act_pos (array(n_legs*3)): actual position of joints.
-                jnt_act_vel (array(n_legs*3)): actual velocity of joints.
-                jnt_act_trq (array(n_legs*3)): actual torque of joints.
-                support_state (array(n_legs)): the supporting state of all legs.
-                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                jnt_act_pos (array(n_leg*3)): actual position of joints.
+                jnt_act_vel (array(n_leg*3)): actual velocity of joints.
+                jnt_act_trq (array(n_leg*3)): actual torque of joints.
+                support_state (array(n_leg)): the supporting state of all legs.
+                support_phase (array(n_leg)): the phase of supporting state of all legs. 
                                             for each leg, phase is a 0-1 scalar, that 
                                             phase=0 at touchdown, phase=1 at lifting up.
         """
@@ -172,8 +172,8 @@ class QuadStateEstimator(object):
             Update kinetic model and get leg kinetic measurements, i.e. sk.
 
             Parameters:
-                jnt_act_pos (array(n_legs*3)): actual position of joints.
-                jnt_act_vel (array(n_legs*3)): actual velocity of joints.
+                jnt_act_pos (array(n_leg*3)): actual position of joints.
+                jnt_act_vel (array(n_leg*3)): actual velocity of joints.
         """
 
         # update kinetic model, note that we just use leg forward kinetics in BODY cs,
@@ -228,9 +228,9 @@ class QuadStateEstimator(object):
             Update Fk, Qk, Hk, and Rk for EKF estimation. See ETH's paper for details.
 
             Parameters:
-                jnt_act_trq (array(n_legs*3)): the joint actual torque of all legs.
-                support_state (array(n_legs)): the supporting state of all legs.
-                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                jnt_act_trq (array(n_leg*3)): the joint actual torque of all legs.
+                support_state (array(n_leg)): the supporting state of all legs.
+                support_phase (array(n_leg)): the phase of supporting state of all legs. 
                                             for each leg, phase is a 0-1 scalar, that 
                                             phase=0 at touchdown, phase=1 at lifting up.
         """
@@ -275,7 +275,7 @@ class QuadStateEstimator(object):
         Qk[12+self.nl:15+self.nl, 6:9] = - self.Qbw @ g2
         Qk[12+self.nl:15+self.nl, 12+self.nl:15+self.nl] = dt * self.Qbw
 
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             Qp = self.get_tip_pos_cov(leg, jnt_act_trq, support_state, support_phase)
             Qk[9+leg*3:12+leg*3, 9+leg*3:12+leg*3] = dt * self.Ck.T @ Qp @ self.Ck
 
@@ -284,13 +284,13 @@ class QuadStateEstimator(object):
         # Update yk
         self.ssk = np.zeros(self.nm) # measurement vector
         self.Ckp1 = rot.from_quat(self.xkp1[6:10]).as_matrix()
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             self.ssk[0+leg*3:3+leg*3] = self.Ckp1 @ (self.xkp1[10+leg*3:13+leg*3] - self.xkp1[0:3])
         self.yk = self.sk - self.ssk # innovation vector
 
         # Update Hk
         Hk = np.zeros((self.nm, self.nis))
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             idx = range(0+leg*3, 3+leg*3)
             Hk[idx, 0:3] = -self.Ckp1
             Hk[idx, 6:9] = skew(self.ssk[idx])
@@ -299,7 +299,7 @@ class QuadStateEstimator(object):
 
         # Update Rk
         Rk = np.zeros((self.nm, self.nm))
-        for leg in range(self.n_legs):
+        for leg in range(self.n_leg):
             idx = range(0+leg*3, 3+leg*3)
             Rk[idx, 0+leg*3:3+leg*3] = self.Rs
         self.Rk = Rk.copy()
@@ -357,9 +357,9 @@ class QuadStateEstimator(object):
 
             Parameters:
                 leg_id (int): the index of leg.
-                jnt_act_trq (array(n_legs*3)): the joint actual torque of all legs.
-                support_state (array(n_legs)): the supporting state of all legs.
-                support_phase (array(n_legs)): the phase of supporting state of all legs. 
+                jnt_act_trq (array(n_leg*3)): the joint actual torque of all legs.
+                support_state (array(n_leg)): the supporting state of all legs.
+                support_phase (array(n_leg)): the phase of supporting state of all legs. 
                                             for each leg, phase is a 0-1 scalar, that 
                                             phase=0 at touchdown, phase=1 at lifting up.
             

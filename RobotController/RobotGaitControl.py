@@ -4,6 +4,7 @@ from scipy.spatial.transform import Rotation as rot
 
 from RobotController.RobotKinematics import RobotKineticModel
 from RobotController.RobotDynamics import RobotDynamicModel, JointOrderMapper
+from RobotController.RobotStateEstimate import QuadStateEstimator
 from RobotController.GaitPatternGenerator import GaitPatternGenerator
 from RobotController.RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
 from RobotController.RobotMPC import QuadConvexMPC
@@ -11,9 +12,10 @@ from RobotController.RobotVMC import QuadSingleBodyVMC
 from RobotController.RobotWBIC import QuadWBIC
 from RobotController.RobotSteer import RobotSteer, DirectionFlag
 
+
 class QuadControlInput(object):
     """
-        Control inputs for quadruped robot
+        Control inputs for quadruped robot.
     """
     # constants
     n_leg: int = 4
@@ -30,6 +32,9 @@ class QuadControlInput(object):
     body_pos: np.ndarray = np.zeros(3)             # actual body position, in WCS
     body_vel: np.ndarray = np.zeros(3)             # actual body linear velocity, in WCS
     body_angvel: np.ndarray = np.zeros(3)          # actual body angular velocity, in WCS
+    # raw measurement from sensor
+    snsr_acc: np.ndarray = np.zeros(3)             # accelerometer readings, in sensor's local frame
+    snsr_gyr: np.ndarray = np.zeros(3)             # gyro readings, in sensor's local frame
 
 
 class QuadRobotCommands(object):
@@ -72,6 +77,9 @@ class QuadGaitController(object):
     dyn_model:  RobotDynamicModel
     idx_mapper: JointOrderMapper
 
+    # state estimator
+    state_estm: QuadStateEstimator
+
     # trj planners
     body_planner:       BodyTrjPlanner
     foothold_planner:   FootholdPlanner
@@ -106,7 +114,7 @@ class QuadGaitController(object):
     jnt_ref_trq_wbic:  np.ndarray
     jnt_ref_trq_final: np.ndarray
 
-    def __init__(self, dt: float, leap: int, urdf_file: str, mesh_dir: str, use_mpc: bool) -> None:
+    def __init__(self, dt: float, leap: int, urdf_file: str, mesh_dir: str, use_mpc: bool, use_se: bool) -> None:
         """
             Create quadruped robot gait controller.
 
@@ -116,6 +124,9 @@ class QuadGaitController(object):
                 urdf_file (str): path of the robot's urdf file.
                 mesh_dir (str): path of the parent directory to store the robot's mesh files.
                 use_mpc(bool): Set the controller to use MPC as body controller, otherwise a VMC is utilized.
+                use_se (bool): Set the controller to use state estimator to estimate robot states based on 
+                               raw sensor's signal (Normal mode), otherwise the controller use robot state 
+                               directly from the simulation environment (God mode). 
         """
         # setup controller options
         self.use_mpc = use_mpc
@@ -141,6 +152,9 @@ class QuadGaitController(object):
         self.dyn_model.load_model(urdf_file, mesh_dir)
 
         self.idx_mapper = JointOrderMapper()
+
+        # setup state estimator
+        self.state_estm = QuadStateEstimator(self.dt)
 
         # setup trajectory planners
         self.body_planner = BodyTrjPlanner(self.dt)
@@ -207,6 +221,13 @@ class QuadGaitController(object):
             feedbacks.body_vel, feedbacks.body_angvel,
             feedbacks.jnt_act_pos, feedbacks.jnt_act_vel
         )
+
+        self.state_estm.reset_state(
+            feedbacks.body_pos, 
+            feedbacks.body_vel,
+            feedbacks.body_orn,
+            feedbacks.jnt_act_pos)
+
         tip_init_pos, _ = self.kin_model.get_tip_state_world()
         self.foothold_planner.init_footholds(tip_init_pos)
 
@@ -308,6 +329,12 @@ class QuadGaitController(object):
         self.current_gait.set_current_time(feedbacks.time_now)
         self.current_support_state = \
             self.current_gait.get_current_support_state()
+
+        # update state estimation
+        self.state_estm.update(feedbacks.snsr_gyr, feedbacks.snsr_acc,
+                               feedbacks.jnt_act_pos, feedbacks.jnt_act_vel,
+                               self.jnt_ref_trq_final, self.current_support_state,
+                               self.current_gait.get_current_support_time_ratio_all()[0])
 
         # update vel cmd for planners
         self.robot_steer.update_vel_cmd(feedbacks.body_orn)

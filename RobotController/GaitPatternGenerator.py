@@ -142,6 +142,24 @@ class GaitPatternGenerator(object):
             swing_time_ratio_dot = 1/self.total_period/(1. - self.duty[leg])
             return swing_time_ratio, swing_time_ratio_dot
 
+    def get_current_swing_time_ratio_all(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+            Get the current time ratio and its time derivative in the swing phase for all legs.
+            This is useful for swing leg trajectory planning and the next foothold prediction.
+
+            Returns:
+                swing_time_ratio (array(n_leg)): time ratio in the swing phase.
+                swing_time_ratio_dot (array(n_leg)): time derivative of the time ratio in the swing phase. 
+        """
+        swing_time_ratio = np.zeros(self.n_leg)
+        swing_time_ratio_dot = np.zeros(self.n_leg)
+        for leg in range(self.n_leg):
+            if self.phase[leg] >= self.duty[leg]:
+                swing_time_ratio[leg] = (self.phase[leg] - self.duty[leg])/(1. - self.duty[leg])
+                swing_time_ratio_dot[leg] = 1/self.total_period/(1. - self.duty[leg])
+        return swing_time_ratio, swing_time_ratio_dot
+
+
     def get_current_support_time_ratio(self, leg: int) -> tuple[float, float]:
         """
             Get the current time ratio and its time derivative in the support phase for a leg.
@@ -161,7 +179,25 @@ class GaitPatternGenerator(object):
             support_time_ratio = self.phase[leg]/self.duty[leg]
             support_time_ratio_dot = 1/self.total_period/self.duty[leg]
             return support_time_ratio, support_time_ratio_dot
-    
+
+    def get_current_support_time_ratio_all(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+            Get the current time ratio and its time derivative in the support phase for all legs.
+            This is useful for state estimator to adjust the covariance of leg tip position in the 
+            estimation model.
+
+            Returns:
+                support_time_ratio (array(n_leg)): time ratio in the support phase.
+                support_time_ratio_dot (array(n_leg)): time derivative of the time ratio in the support phase. 
+        """
+        support_time_ratio = np.zeros(self.n_leg)
+        support_time_ratio_dot = np.zeros(self.n_leg)
+        for leg in range(self.n_leg):
+            if self.phase[leg] <= self.duty[leg]:
+                support_time_ratio[leg] = self.phase[leg]/self.duty[leg]
+                support_time_ratio_dot[leg] = 1/self.total_period/self.duty[leg]
+        return support_time_ratio, support_time_ratio_dot
+
 
     def get_swing_time_left(self) -> np.ndarray:
         """

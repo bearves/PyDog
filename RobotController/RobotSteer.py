@@ -115,7 +115,7 @@ class RobotSteer(object):
         self.vel_cmd_local *= 0.99 # if no key cmd, decay to zero
 
         # filter 
-        phi = 0.02
+        phi = 0.01
         self.vel_cmd_local_filtered = (1. - phi) * self.vel_cmd_local_filtered + phi * self.vel_cmd_local
 
         # transform from body cs to wcs

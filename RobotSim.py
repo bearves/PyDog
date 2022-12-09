@@ -46,6 +46,7 @@ jnt_ref_pos0 = np.array([-0.0, 0.75, -1.35,
                         -0.0, 0.75, -1.35])
 jnt_ref_vel0 = np.array([0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0])
+last_body_vel = np.array([0, 0, 0])
 
 count = 0
 in_gait_start_time = 3.0
@@ -56,7 +57,7 @@ leap = 25
 urdf_file = r'./models/a1/a2_pino.urdf'
 mesh_dir  = r'./models/a1/'
 gait_controller = rc.QuadGaitController(
-    time_step, leap, urdf_file, mesh_dir, use_mpc=True)
+    time_step, leap, urdf_file, mesh_dir, use_mpc=True, use_se=False)
         
 feedbacks = rc.QuadControlInput()
 user_cmd = rc.QuadRobotCommands()
@@ -75,11 +76,23 @@ while 1:
     # get robot body states
     base_pos = pb.getBasePositionAndOrientation(dog)
     base_vel = pb.getBaseVelocity(dog)
+
+    # simulate accelerometer and gyro sensor
+    body_acc_wcs = (np.array(base_vel[0]) - last_body_vel)/time_step
+    last_body_vel = np.array(base_vel[0])
+    body_gyr_wcs = np.array(base_vel[1])
+    Rb_wcs = rot.from_quat(base_pos[1]).as_matrix()
+    body_acc_bcs = Rb_wcs.T @ body_acc_wcs
+    body_gyr_bcs = Rb_wcs.T @ body_gyr_wcs
+
+    # set inputs of controller
     feedbacks.time_now = time_now
     feedbacks.body_pos = np.array(base_pos[0])
     feedbacks.body_vel = np.array(base_vel[0])
     feedbacks.body_orn = np.array(base_pos[1])
     feedbacks.body_angvel = np.array(base_vel[1])
+    feedbacks.snsr_acc = body_acc_bcs
+    feedbacks.snsr_gyr = body_gyr_bcs
 
     if feedbacks.body_orn[3] < 0:
         feedbacks.body_orn *= -1.
