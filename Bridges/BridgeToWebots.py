@@ -191,9 +191,9 @@ class BridgeToWebots(object):
         return self.robot.step(self.timestep)
 
     
-    def save_data(self, support_state, support_phase):
+    def save_data(self, support_state, support_phase, est_body_pos, est_body_vel, est_body_orn):
         # concat all data
-        data = np.zeros(1 + 3 + 3 + 4 + 12 + 12 + 12 + 4 + 4 + 3 + 3 + 4 + 3)
+        data = np.zeros(1 + 3 + 3 + 4 + 12 + 12 + 12 + 4 + 4 + 3 + 3 + 4 + 3 + 3 + 3 + 4)
         data[0]     = self.cnt
         data[1:4]   = self.snsr_acc
         data[4:7]   = self.snsr_gyro
@@ -207,6 +207,9 @@ class BridgeToWebots(object):
         data[58:61] = self.body_act_vel
         data[61:65] = self.body_act_orn
         data[65:68] = self.body_act_angvel
+        data[68:71] = est_body_pos
+        data[71:74] = est_body_vel
+        data[74:78] = est_body_orn
 
         data_str = np.array2string(data, precision=8, separator=',')
         data_str = data_str.strip('[]').replace('\n','') + '\n'

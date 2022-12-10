@@ -99,7 +99,6 @@
     - For each leg, if always early/late touchdown, slowly adjust foothold height accordingly.
     - Sudden early touchdown, replan the leg trajectory.
 
-
 13.  Body state estimator
     - Implement ETH's state estimator (DONE)
       - Extended Kalman Filter formulation(DONE)
@@ -111,8 +110,9 @@
       - Qw, Qf
       - Rs, Qpst, Qpsw
     - Integrate state estimation to gait controller (Ongoing)
+      - Integrating
+      - Add log for estimated data analysis
       - Modify foothold height according to body state and ground height
-
 
 14.  Terrain slope estimation and body adaption
 

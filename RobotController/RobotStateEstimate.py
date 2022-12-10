@@ -340,6 +340,36 @@ class QuadStateEstimator(object):
                 xk (array(ns)): the estimated robot state.
         """
         return self.xk.copy()
+    
+    
+    def get_est_body_pos_wcs(self) -> np.ndarray:
+        """
+            Get the estimated body position in WCS.
+
+            Returns:
+                pos (array(3)): the estimated body position.
+        """
+        return self.xk[0:3]
+
+
+    def get_est_body_vel_wcs(self) -> np.ndarray:
+        """
+            Get the estimated body velocity in WCS.
+
+            Returns:
+                vel (array(3)): the estimated body velocity.
+        """
+        return self.xk[3:6]
+
+
+    def get_est_body_orn_wcs(self) -> np.ndarray:
+        """
+            Get the estimated body orientation in WCS.
+
+            Returns:
+                orn (array(3)): the estimated body orientation.
+        """
+        return quat_inv(self.xk[6:10])
 
 
     def get_tip_pos_cov(self, 

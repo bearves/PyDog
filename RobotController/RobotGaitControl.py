@@ -53,8 +53,11 @@ class QuadControlOutput(object):
     n_leg: int = 4
     # control output
     joint_tgt_trq: np.ndarray = np.zeros(n_leg *3) # joint target torque command
-    support_state: np.ndarray = np.ones(n_leg)
-    support_phase: np.ndarray = np.zeros(n_leg)
+    support_state: np.ndarray = np.ones(n_leg)     # support state of all legs
+    support_phase: np.ndarray = np.zeros(n_leg)    # support phase of all legs
+    est_body_pos: np.ndarray = np.zeros(3)         # estimated body pos in WCS
+    est_body_vel: np.ndarray = np.zeros(3)         # estimated body vel in WCS
+    est_body_orn: np.ndarray = np.zeros(4)         # estimated body orn in WCS
 
 
 class QuadRobotState(object):
@@ -387,18 +390,17 @@ class QuadGaitController(object):
                                 self.jnt_ref_trq_final, self.current_support_state,
                                 self.current_gait.get_current_support_time_ratio_all()[0])
             
-            x = self.state_estm.get_results()
-            
-            # TODO: use state estimator's result
+            # TODO: when using state estimator's result, 
+            # the foothold planning should be adjusted for consistent body height.
             self.current_robot_state.reset(
-                feedbacks.body_pos, feedbacks.body_vel,
-                feedbacks.body_orn, feedbacks.body_angvel,
-                feedbacks.jnt_act_pos, feedbacks.jnt_act_vel);
+                self.state_estm.get_est_body_pos_wcs(), self.state_estm.get_est_body_vel_wcs(),
+                self.state_estm.get_est_body_orn_wcs(), feedbacks.body_angvel,
+                feedbacks.jnt_act_pos, feedbacks.jnt_act_vel)
         else:
             self.current_robot_state.reset(
                 feedbacks.body_pos, feedbacks.body_vel,
                 feedbacks.body_orn, feedbacks.body_angvel,
-                feedbacks.jnt_act_pos, feedbacks.jnt_act_vel);
+                feedbacks.jnt_act_pos, feedbacks.jnt_act_vel)
 
 
         # update vel cmd for planners
@@ -613,6 +615,9 @@ class QuadGaitController(object):
         output.support_state = self.current_support_state
         output.support_phase = \
                 self.current_gait.get_current_support_time_ratio_all()[0]
+        output.est_body_pos = self.state_estm.get_est_body_pos_wcs()
+        output.est_body_vel = self.state_estm.get_est_body_vel_wcs()
+        output.est_body_orn = self.state_estm.get_est_body_orn_wcs()
         return output
 
 

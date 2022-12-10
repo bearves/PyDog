@@ -64,7 +64,11 @@ while 1:
 
     # save data for analysis
     if in_gait:
-        bridge.save_data(output.support_state, output.support_phase)
+        bridge.save_data(output.support_state, 
+                         output.support_phase,
+                         output.est_body_pos,
+                         output.est_body_vel,
+                         output.est_body_orn)
     
     # proceed simulation 
     bridge.step()
