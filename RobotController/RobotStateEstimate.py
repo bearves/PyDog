@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from scipy.spatial.transform import Rotation as rot
+import scipy.linalg
 from RobotController import RobotKinematics as rkin
 
 class QuadStateEstimator(object):
@@ -300,8 +301,7 @@ class QuadStateEstimator(object):
         # Update Rk
         Rk = np.zeros((self.nm, self.nm))
         for leg in range(self.n_leg):
-            idx = range(0+leg*3, 3+leg*3)
-            Rk[idx, 0+leg*3:3+leg*3] = self.Rs
+            Rk[0+leg*3:3+leg*3, 0+leg*3:3+leg*3] = self.Rs
         self.Rk = Rk.copy()
 
 
@@ -312,10 +312,13 @@ class QuadStateEstimator(object):
         """
         Pkp1 = self.Fk @ self.Pk @ self.Fk.T + self.Qk          # dim(Pkp1) = nis x nis
         Sk = self.Hk @ Pkp1 @ self.Hk.T + self.Rk               # dim(Sk) = nm x nm
-        invSk = np.linalg.inv(Sk)
-        self.Kk = Pkp1 @ self.Hk.T @ invSk                      # dim(Kk) = nis x nm
-        self.dx = self.Kk @ self.yk                             # dim(dx) = nis x 1
-        self.Pk = (np.eye(self.nis) - self.Kk @ self.Hk) @ Pkp1 # dim(Pk) = nis x nis
+        Sk = 0.5 * (Sk + Sk.T)
+        invSy = np.linalg.solve(Sk, self.yk)
+        invSH = np.linalg.solve(Sk, self.Hk)
+        self.dx = Pkp1 @ self.Hk.T @ invSy                      # dim(dx) = nis x 1
+        self.Pk = Pkp1 - Pkp1 @ self.Hk.T @ invSH @ Pkp1        # dim(Pk) = nis x nis
+        self.Pk = 0.5 * (self.Pk + self.Pk.T)
+
 
 
     def state_correct(self):
