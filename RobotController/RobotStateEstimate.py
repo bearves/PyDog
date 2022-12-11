@@ -313,12 +313,13 @@ class QuadStateEstimator(object):
         Pkp1 = self.Fk @ self.Pk @ self.Fk.T + self.Qk          # dim(Pkp1) = nis x nis
         Sk = self.Hk @ Pkp1 @ self.Hk.T + self.Rk               # dim(Sk) = nm x nm
         Sk = 0.5 * (Sk + Sk.T)
-        invSy = np.linalg.solve(Sk, self.yk)
-        invSH = np.linalg.solve(Sk, self.Hk)
-        self.dx = Pkp1 @ self.Hk.T @ invSy                      # dim(dx) = nis x 1
-        self.Pk = Pkp1 - Pkp1 @ self.Hk.T @ invSH @ Pkp1        # dim(Pk) = nis x nis
+        # Augment for solve once
+        RHS = np.hstack((self.yk.reshape((self.nm, 1)), self.Hk))
+        invSyH = np.linalg.solve(Sk, RHS)
+        self.Kk = Pkp1 @ self.Hk.T
+        self.dx = self.Kk @ invSyH[:, 0]                        # dim(dx) = nis x 1
+        self.Pk = (np.eye(self.nis) - self.Kk @ invSyH[:, 1:]) @ Pkp1        # dim(Pk) = nis x nis
         self.Pk = 0.5 * (self.Pk + self.Pk.T)
-
 
 
     def state_correct(self):
@@ -418,6 +419,7 @@ class QuadStateEstimator(object):
                 trust = (1 - stage1 - support_phase[leg_id])/gap
             else:
                 trust = 0.0
+        # TODO: take consideration of the leg force
         return self.Qpst * trust + self.Qpsw * (1-trust)
 
 

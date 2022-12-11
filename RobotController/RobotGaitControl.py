@@ -567,6 +567,15 @@ class QuadGaitController(object):
         self.jnt_ref_vel_wbic = self.idx_mapper.convert_jvec_to_our(ret[1])
         self.jnt_ref_trq_wbic = self.idx_mapper.convert_jvec_to_our(ret[2])
 
+        jnt_range_max = np.array([ 1.37,  3.0, -0.1])
+        jnt_range_min = np.array([-1.37,-1.37, -3.0])
+        # joint range limitation
+        for i in range(self.n_leg):
+            for j in range(3):
+                if self.jnt_ref_pos_wbic[i*3 + j] > jnt_range_max[j] or \
+                   self.jnt_ref_pos_wbic[i*3 + j] < jnt_range_min[j]:
+                    self.jnt_ref_pos_wbic[i*3 + j] = self.current_robot_state.jnt_pos[i*3 + j]
+                    self.jnt_ref_vel_wbic[i*3 + j] = 0
 
     def solve_static_dyn(self):
         """

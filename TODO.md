@@ -90,6 +90,9 @@
         - Reason: Late touchdown?
     - FIX: When turn 180 deg/large angle, the whole robot lost control (DONE)
         - Reason: wrong set to WBIC's body ref orn 
+    - FIX: The wbic may cause the leg's knee/shoulder joint to flip 
+        - Reason: multiple inverse solution of leg
+        - fix: check if the joint position go beyond the allowable range
 
 11. Change simulator and re-write simulation codes (DONE)
     - Setup Webots simulator interface
@@ -109,10 +112,10 @@
       - Qbw, Qbf
       - Qw, Qf
       - Rs, Qpst, Qpsw
-    - Integrate state estimation to gait controller (Ongoing)
-      - Integrating
-      - Add log for estimated data analysis
-      - Modify foothold height according to body state and ground height
+    - Integrate state estimation to gait controller 
+      - Integrating(DONE)
+      - Add log for estimated data analysis(DONE)
+      - Modify foothold height according to body state and ground height(Ongoing)
 
 14.  Terrain slope estimation and body adaption
 
