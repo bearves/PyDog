@@ -186,9 +186,13 @@ class QuadGaitController(object):
         self.stand_gait = GaitPatternGenerator(
             'stand', 0.5, np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]))
 
-        self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
-            [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
-        
+        # flying trot
+        #self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
+        #    [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
+        # walking trot
+        self.trot_gait = GaitPatternGenerator('trot', 0.5, np.array(
+            [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
+            
         self.current_gait = self.stand_gait
 
         # setup kinematics model
@@ -562,20 +566,9 @@ class QuadGaitController(object):
                           task_ddot_ref,
                           ref_leg_force_wcs_pino
                           )
-        dq = self.idx_mapper.convert_jvec_to_our(ret[0])
-        self.jnt_ref_pos_wbic = self.current_robot_state.jnt_pos + dq
+        self.jnt_ref_pos_wbic = self.idx_mapper.convert_jvec_to_our(ret[0])
         self.jnt_ref_vel_wbic = self.idx_mapper.convert_jvec_to_our(ret[1])
         self.jnt_ref_trq_wbic = self.idx_mapper.convert_jvec_to_our(ret[2])
-
-        jnt_range_max = np.array([ 1.37,  3.0, -0.1])
-        jnt_range_min = np.array([-1.37,-1.37, -3.0])
-        # joint range limitation
-        for i in range(self.n_leg):
-            for j in range(3):
-                if self.jnt_ref_pos_wbic[i*3 + j] > jnt_range_max[j] or \
-                   self.jnt_ref_pos_wbic[i*3 + j] < jnt_range_min[j]:
-                    self.jnt_ref_pos_wbic[i*3 + j] = self.current_robot_state.jnt_pos[i*3 + j]
-                    self.jnt_ref_vel_wbic[i*3 + j] = 0
 
     def solve_static_dyn(self):
         """

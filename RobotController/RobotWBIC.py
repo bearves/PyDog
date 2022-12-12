@@ -1,4 +1,3 @@
-from turtle import rt
 import numpy as np
 import qpsolvers
 import RobotController.RobotDynamics as rdyn
@@ -16,6 +15,8 @@ class QuadWBIC(object):
     ground_fric: float = 0.4  # round Coulomb friction constant
     fz_min : float = 0.15     # minimum vertical force for supporting leg
     fz_max : float = 150      # maximum vertical force for supporting leg
+    leg_jnt_range_max: np.ndarray = np.array([ 0.802, 4.188, -0.416]) # maximum range of joints for each leg
+    leg_jnt_range_min: np.ndarray = np.array([-0.802,-1.047, -2.696]) # minimum range of joints for each leg
 
     # Selecting matrix of the floating base dynamics
     # Sf selects first 6 rows, which is the floating base dynamics
@@ -53,7 +54,7 @@ class QuadWBIC(object):
                 fr_mpc    (array(n_leg * 3)) : tip force in WCS obtained by MPC, in pinocchio's definition.
             
             Returns:
-                dq (array(n_leg * 3)): Joint position adjustment.
+                new_q (array(n_leg * 3)): adjusted Joint position position.
                 qdot (array(n_leg * 3)): Joint target velocity.
                 tau (array(n_leg * 3)): Joint target torque.
         """
@@ -65,13 +66,26 @@ class QuadWBIC(object):
         # run kinWBC
         dq, qdot, qddot = self.run_kinWBC(dyn_model, task_list)
 
+        # check joint range limitation
+        new_q = dyn_model.q[7:7+nj] + dq[6:6+nj]
+        for i in range(self.n_leg):
+            for j in range(3):
+                if new_q[i*3 + j] > self.leg_jnt_range_max[j]:
+                    new_q[i*3 + j] = self.leg_jnt_range_max[j]
+                    qdot[6 + i*3 + j] = 0
+                    qddot[6 + i*3 + j] = 0
+                elif new_q[i*3 + j] < self.leg_jnt_range_min[j]:
+                    new_q[i*3 + j] = self.leg_jnt_range_min[j]
+                    qdot[6 + i*3 + j] = 0
+                    qddot[6 + i*3 + j] = 0
+
         # run WBIC
         tau = self.run_WBIC(dyn_model, qddot, fr_mpc)
 
         # get results: 
-        # dq, qdot for joint PD control target
-        # tau_j for joint PD feedforward
-        return dq[6:6+nj], qdot[6:6+nj], tau
+        # q, qdot for joint PD control target (only for leg joints)
+        # tau_j for joint PD feedforward (only for leg joints)
+        return new_q, qdot[6:6+nj], tau
     
 
     def update_task(self,                

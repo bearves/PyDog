@@ -139,11 +139,11 @@ ret = wbic.update(model,
                   task_ddot_ref,
                   u_mpc_pino
                   )
-dq = mapper.convert_jvec_to_our(ret[0])
+new_q = mapper.convert_jvec_to_our(ret[0])
 qdot = mapper.convert_jvec_to_our(ret[1])
 tau_wbic = mapper.convert_jvec_to_our(ret[2])
 print('WBIC Result')
-print('dq =', dq)
+print('q =', new_q)
 print('qdot = ', qdot)
 print('tau_wbic = ', tau_wbic)
 
