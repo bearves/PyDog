@@ -10,13 +10,17 @@ class QuadTerrainEstimator(object):
     def __init__(self) -> None:
         self.gnd_pts = np.zeros((self.n_leg*3, self.n_step))
 
-    def reset(self):
-        # set initial value for ground
-        pass
+    def reset(self, tip_pos_wcs):
+        # set initial values for ground
+        for i in range(self.n_step):
+            self.gnd_pts[:, i] = tip_pos_wcs
 
-    def update(self, tip_pos, support_phase):
-        # take tip pos and support phase as input
+
+    def update(self, tip_pos_wcs, support_phase):
         # record tip pos of the neutral point
+        for leg in range(self.n_leg):
+            if support_phase >= 0.5:
+                # found a neutral point
+                pass
         # calculate ground plane
         # update ground normal 
-        pass 
