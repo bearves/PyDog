@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as Rot
 
 from RobotController import RobotMPC as ctrl
 
-mpc = ctrl.QuadConvexMPC(1.0/240.)
+mpc = ctrl.QuadConvexMPC(1.0/240., 6)
 
 body_rot = Rot.from_rotvec([0,0,0.1])
 A, B = mpc.cal_state_equation(

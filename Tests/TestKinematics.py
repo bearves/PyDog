@@ -6,9 +6,13 @@ import RobotController.RobotKinematics as rkm
 
 model = rkm.RobotKineticModel()
 
-for i in range(100000):
+for i in range(10000):
     jnt_pos = np.random.uniform(0, 1, 3)
-    jnt_pos = np.diag([np.pi, np.pi, np.pi]) @ jnt_pos + np.array([-np.pi/2., -np.pi/2., -np.pi])
+    jnt_pos = np.diag([np.pi/2, np.pi/2, np.pi/2]) @ jnt_pos + np.array([0, 0, -np.pi])
+    if jnt_pos[2] > -0.1:
+        jnt_pos[2] = -0.1
+    if jnt_pos[2] < -2.7:
+        jnt_pos[2] = -2.7
 
     #jnt_pos = np.array([0, 0, -0.1])
     jnt_vel = np.random.rand(3)

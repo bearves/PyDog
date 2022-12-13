@@ -11,7 +11,7 @@ from RobotController import RobotKinematics as rkin
 
 np.set_printoptions(precision=4, suppress=True)
 
-mpc = ctrl.QuadConvexMPC(1.0/1000.)
+mpc = ctrl.QuadConvexMPC(1.0/1000., 25)
 kin = rkin.RobotKineticModel()
 
 ##################
@@ -33,7 +33,8 @@ jnt_pos_act = np.array([-0.0, 0.75, -1.3,
 jnt_vel_act = np.array([0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0])
 
-kin.update(body_pos_act, body_ori_act, body_vel_act, body_angvel_act, jnt_pos_act, jnt_vel_act)
+kin.update_leg(jnt_pos_act, jnt_vel_act)
+kin.update_body(body_pos_act, body_ori_act, body_vel_act, body_angvel_act)
 
 leg_tip_pos_wcs_act, leg_tip_vel_wcs_act = kin.get_tip_state_world()
 

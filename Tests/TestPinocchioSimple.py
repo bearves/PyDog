@@ -3,7 +3,7 @@ import numpy as np
 from pinocchio.robot_wrapper import RobotWrapper
 from pinocchio.utils import mprint
 from scipy.spatial.transform import Rotation as rot
-from pinocchio.visualize import MeshcatVisualizer
+#from pinocchio.visualize import MeshcatVisualizer
 
 import sys,os
 sys.path.append(os.getcwd()+'/..')
@@ -66,10 +66,11 @@ print('Frame velocity')
 trunk_vel = pin.getFrameVelocity(robot.model, robot.data, trunk_frame_id, pin.ReferenceFrame.WORLD)
 print(trunk_vel)
 
-robot.setVisualizer(MeshcatVisualizer())
-robot.initViewer()
-robot.loadViewerModel("pinocchio")
-robot.display(q)
+# Meshcat is required to run visualizer
+#robot.setVisualizer(MeshcatVisualizer())
+#robot.initViewer()
+#robot.loadViewerModel("pinocchio")
+#robot.display(q)
 
 #while True:
 #    c = input()

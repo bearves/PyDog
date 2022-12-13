@@ -13,5 +13,5 @@ ss = trot_generator.get_current_support_state()
 
 print(ss)
 
-ss_pred = trot_generator.predict_mpc_support_state(32, 32 * 0.001)
+ss_pred = trot_generator.predict_mpc_support_state(32 * 0.001, 32)
 print(ss_pred)

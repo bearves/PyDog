@@ -132,7 +132,8 @@ my_model = rkm.RobotKineticModel()
 body_rm = rot.from_quat(root_ori).as_matrix()
 trunk_com_pos = root_pos + body_rm @ my_model.COM_OFFSET
 #print(trunk_com_pos - root_pos)
-my_model.update(trunk_com_pos, root_ori, root_vel, root_angvel, jnt_pos, jnt_vel)
+my_model.update_leg(jnt_pos, jnt_vel)
+my_model.update_body(trunk_com_pos, root_ori, root_vel, root_angvel)
 jc = my_model.get_contact_jacobian_wcs(leg_test)
 
 print(jc[0:3,0:6])

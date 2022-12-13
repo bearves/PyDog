@@ -61,9 +61,6 @@ class QuadStateEstimator(object):
     I3: np.ndarray = np.eye(3)              # 3x3 Identity mat
     O3: np.ndarray = np.zeros(3)            # 3x3 Zero mat
 
-    # kinematic model for state estimation (Leg kinetics)
-    kin_model : rkin.RobotKineticModel
-
     
     def __init__(self, dt: float) -> None:
         """
@@ -99,15 +96,12 @@ class QuadStateEstimator(object):
 
         self.Rs = 1e-6 * np.eye(3)
 
-        # create kinematic model
-        self.kin_model = rkin.RobotKineticModel()
-
 
     def reset_state(self, 
                     body_pos: np.ndarray, 
                     body_vel: np.ndarray,
                     body_orn: np.ndarray,
-                    jnt_pos: np.ndarray):
+                    tip_pos_wcs: np.ndarray):
         """
             Reset robot state as the initial estimation.
             
@@ -115,12 +109,8 @@ class QuadStateEstimator(object):
                 body_pos (array(3)): initial body position in WCS.
                 body_vel (array(3)): initial body velocity in WCS.
                 body_orn (array(4)): initial body orientation in WCS, expressed in quaternion.
-                jnt_pos  (array(n_leg*3)): initial joint position.
+                tip_pos_wcs  (array(n_leg*3)): initial tip position in WCS.
         """
-        # get initial tip position from FK
-        self.kin_model.update(body_pos, body_orn, body_vel, np.zeros(3), jnt_pos, 0 * jnt_pos)
-        tip_pos_wcs, tip_vel_wcs = self.kin_model.get_tip_state_body()
-
         self.xk[0:3] = body_pos             # p in WCS
         self.xk[3:6] = body_vel             # v in WCS
         self.xk[6:10] = quat_inv(body_orn)  # in ETH paper, q from WCS to BCS is used
@@ -132,6 +122,7 @@ class QuadStateEstimator(object):
 
 
     def update(self, 
+               kin_model : rkin.RobotKineticModel,
                body_gyr_bcs: np.ndarray, 
                body_acc_bcs: np.ndarray, 
                jnt_act_pos: np.ndarray, 
@@ -143,6 +134,7 @@ class QuadStateEstimator(object):
             Update and estimate robot states.
 
             Parameters:
+                kin_model (rkin.RobotKineticModel): reference to the robot kinetic model.
                 body_gyr_bcs (array(3)): body angular velocity, in BCS
                 body_acc_bcs (array(3)): body linear acceleration, in BCS.
                 jnt_act_pos (array(n_leg*3)): actual position of joints.
@@ -155,7 +147,7 @@ class QuadStateEstimator(object):
         """
         
         # calculate leg kinematics for measurement error
-        self.update_kinetic_model(jnt_act_pos, jnt_act_vel)
+        self.update_kinetic_measurement(kin_model, jnt_act_pos, jnt_act_vel)
         # predict next state: xk+1_pred = pred(xk)
         self.state_predict(body_gyr_bcs, body_acc_bcs)
         # update matrices of Kalman filter Fk, Qk, Hk, Rk
@@ -166,23 +158,22 @@ class QuadStateEstimator(object):
         self.state_correct()
 
 
-    def update_kinetic_model(self, 
+    def update_kinetic_measurement(self, 
+                             kin_model : rkin.RobotKineticModel,
                              jnt_act_pos: np.ndarray,
                              jnt_act_vel: np.ndarray):
         """
             Update kinetic model and get leg kinetic measurements, i.e. sk.
 
             Parameters:
+                kin_model (rkin.RobotKineticModel): reference to the robot kinetic model.
                 jnt_act_pos (array(n_leg*3)): actual position of joints.
                 jnt_act_vel (array(n_leg*3)): actual velocity of joints.
         """
 
-        # update kinetic model, note that we just use leg forward kinetics in BODY cs,
-        # thus the body states are not passed to the kinetic model
-        self.kin_model.update(np.zeros(3), np.array([0, 0, 0, 1]),
-                              np.zeros(3), np.zeros(3),
-                              jnt_act_pos, jnt_act_vel)
-        tip_pos_wrt_body, tip_vel_wrt_body = self.kin_model.get_tip_state_body()
+        # kinetic model has updated leg states, note that we just use leg forward kinetics in BODY cs,
+        # thus the body states have not been updated yet
+        tip_pos_wrt_body, tip_vel_wrt_body = kin_model.get_tip_state_body()
         self.sk = tip_pos_wrt_body
 
 

@@ -74,33 +74,19 @@ class RobotKineticModel(object):
         # assign leg symmetry flag of each leg, right leg = 1, left leg = -1
         self.leg_sym_flag_ = np.array([1, -1, 1, -1])
 
-    def update(self, 
-               body_pos: np.ndarray, 
-               body_orn: np.ndarray, 
-               body_vel: np.ndarray, 
-               body_angvel: np.ndarray, 
+    def update_leg(self, 
                jnt_actpos: np.ndarray, 
                jnt_actvel: np.ndarray):
         """
-            Update model states and calculate robot kinematics.
+            Update joint states and calculate robot leg kinematics.
 
             Parameters:
-                body_pos       (array(3)): current position of the body center, in WCS.
-                body_orn       (array(4)): current orientation in quaternion of the body, in WCS.
-                body_vel       (array(3)): current linear velocity of the body center, in WCS.
-                body_angvel    (array(3)): current angular velocity of the body, in WCS.
                 joint_actpos   (array(n_leg*3)): current joint position, in Our/Pybullet's order.
                 joint_actvel   (array(n_leg*3)): current joint velocity, in Our/Pybullet's order.
         """
-        self.body_pos_ = body_pos.copy()
-        self.body_vel_ = body_vel.copy()
-        self.body_orn_ = body_orn.copy()
-        self.body_angvel_ = body_angvel.copy()
+
         self.jnt_pos_ = jnt_actpos.copy()
         self.jnt_vel_ = jnt_actvel.copy()
-
-        self.body_R_ = Rot.from_quat(body_orn).as_matrix()
-        self.body_euler_ = Rot.from_quat(body_orn).as_euler('ZYX')
 
         # update leg forward kinetics
         for i in range(self.n_leg):
@@ -110,7 +96,35 @@ class RobotKineticModel(object):
 
             self.tip_pos_body_[idx] = self.hip_pos_[idx] + self.hip_R_[i,:,:] @ self.tip_pos_hip_[idx]
             self.tip_vel_body_[idx] = self.hip_R_[i,:,:] @ self.tip_vel_hip_[idx]
+    
 
+    def update_body(self, 
+               body_pos: np.ndarray, 
+               body_orn: np.ndarray, 
+               body_vel: np.ndarray, 
+               body_angvel: np.ndarray):
+        """
+            Update body states and calculate robot kinematics.
+            This method must be called after update_leg().
+
+            Parameters:
+                body_pos       (array(3)): current position of the body center, in WCS.
+                body_orn       (array(4)): current orientation in quaternion of the body, in WCS.
+                body_vel       (array(3)): current linear velocity of the body center, in WCS.
+                body_angvel    (array(3)): current angular velocity of the body, in WCS.
+        """
+
+        self.body_pos_ = body_pos.copy()
+        self.body_vel_ = body_vel.copy()
+        self.body_orn_ = body_orn.copy()
+        self.body_angvel_ = body_angvel.copy()
+
+        self.body_R_ = Rot.from_quat(body_orn).as_matrix()
+        self.body_euler_ = Rot.from_quat(body_orn).as_euler('ZYX')
+
+        # update leg forward kinetics
+        for i in range(self.n_leg):
+            idx = range(0+i*3, 3+i*3)
             self.tip_pos_world_[idx] = body_pos + self.body_R_ @ self.tip_pos_body_[idx]
             self.tip_vel_world_[idx] = body_vel + self.body_R_ @ self.tip_vel_body_[idx] + \
                                        np.cross(body_angvel, self.body_R_ @ self.tip_pos_body_[idx])

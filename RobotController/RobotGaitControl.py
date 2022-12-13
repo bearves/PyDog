@@ -187,11 +187,11 @@ class QuadGaitController(object):
             'stand', 0.5, np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]))
 
         # flying trot
-        #self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
-        #    [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
+        self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
+            [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
         # walking trot
-        self.trot_gait = GaitPatternGenerator('trot', 0.5, np.array(
-            [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
+        #self.trot_gait = GaitPatternGenerator('trot', 0.5, np.array(
+        #    [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
             
         self.current_gait = self.stand_gait
 
@@ -276,17 +276,19 @@ class QuadGaitController(object):
             np.zeros(3),
             np.zeros(3))
 
-        self.kin_model.update(
+        self.kin_model.update_leg(
+            self.current_robot_state.jnt_pos,self.current_robot_state.jnt_vel
+        )
+        self.kin_model.update_body(
             self.current_robot_state.body_pos, self.current_robot_state.body_orn,
             self.current_robot_state.body_vel, self.current_robot_state.body_angvel,
-            self.current_robot_state.jnt_pos,self.current_robot_state.jnt_vel
         )
 
         self.state_estm.reset_state(
             self.current_robot_state.body_pos, 
             self.current_robot_state.body_vel,
             self.current_robot_state.body_orn,
-            self.current_robot_state.jnt_pos)
+            self.kin_model.get_tip_state_world()[0])
 
         tip_init_pos, _ = self.kin_model.get_tip_state_world()
         self.foothold_planner.init_footholds(tip_init_pos)
@@ -385,11 +387,16 @@ class QuadGaitController(object):
         self.current_support_state = \
             self.current_gait.get_current_support_state()
 
+        self.kin_model.update_leg(
+            self.current_robot_state.jnt_pos, self.current_robot_state.jnt_vel
+        )
+
         # update state estimation
         if self.use_se:
             body_gyr = self.Rs_bcs @ feedbacks.snsr_gyr
             body_acc = self.Rs_bcs @ feedbacks.snsr_acc 
-            self.state_estm.update(body_gyr, body_acc,
+            self.state_estm.update(self.kin_model,
+                                body_gyr, body_acc,
                                 feedbacks.jnt_act_pos, feedbacks.jnt_act_vel,
                                 self.jnt_ref_trq_final, self.current_support_state,
                                 self.current_gait.get_current_support_time_ratio_all()[0])
@@ -411,10 +418,9 @@ class QuadGaitController(object):
         self.robot_steer.update_vel_cmd(self.current_robot_state.body_orn)
 
         # update kinematic model
-        self.kin_model.update(
+        self.kin_model.update_body(
             self.current_robot_state.body_pos, self.current_robot_state.body_orn,
             self.current_robot_state.body_vel, self.current_robot_state.body_angvel,
-            self.current_robot_state.jnt_pos, self.current_robot_state.jnt_vel
         )
         self.tip_act_pos, self.tip_act_vel = \
             self.kin_model.get_tip_state_world()

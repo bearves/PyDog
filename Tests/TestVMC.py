@@ -4,7 +4,7 @@ import numpy as np
 from RobotController import RobotVMC as ctrl
 
 
-vmc = ctrl.QuadSingleBodyVMC(1./1000.)
+vmc = ctrl.QuadSingleBodyVMC(1./1000.,25)
 
 body_orn = np.array([0,0,0,1])
 r_leg = np.array([0.183, -0.047, 0,
