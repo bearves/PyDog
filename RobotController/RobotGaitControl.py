@@ -5,6 +5,7 @@ from scipy.spatial.transform import Rotation as rot
 from RobotController.RobotKinematics import RobotKineticModel
 from RobotController.RobotDynamics import RobotDynamicModel, JointOrderMapper
 from RobotController.RobotStateEstimate import QuadStateEstimator
+from RobotController.RobotTerrainEstimate import QuadTerrainEstimator
 from RobotController.GaitPatternGenerator import GaitPatternGenerator
 from RobotController.RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
 from RobotController.RobotMPC import QuadConvexMPC
@@ -125,6 +126,7 @@ class QuadGaitController(object):
     # state estimator
     Rs_bcs: np.ndarray # Rotation matrix of the sensor measurement frame, w.r.t. body cs
     state_estm: QuadStateEstimator
+    terrn_estm: QuadTerrainEstimator
 
     # trj planners
     body_planner:       BodyTrjPlanner
@@ -143,6 +145,7 @@ class QuadGaitController(object):
     count: int
     gait_switch_cmd: bool
     current_support_state: np.ndarray
+    current_support_phase: np.ndarray
     current_robot_state: QuadRobotState
     tip_act_pos: np.ndarray
     tip_act_vel: np.ndarray
@@ -209,6 +212,7 @@ class QuadGaitController(object):
         # setup state estimator
         self.Rs_bcs = Rs_bcs
         self.state_estm = QuadStateEstimator(self.dt)
+        self.terrn_estm = QuadTerrainEstimator()
 
         # setup trajectory planners
         self.body_planner = BodyTrjPlanner(self.dt)
@@ -231,6 +235,7 @@ class QuadGaitController(object):
         self.count = 0
         self.gait_switch_cmd = False
         self.current_support_state = np.ones(self.n_leg)
+        self.current_support_phase = np.zeros(self.n_leg)
         self.current_robot_state = QuadRobotState()
         self.tip_act_pos = np.zeros(self.n_leg * 3)
         self.tip_act_vel = np.zeros(self.n_leg * 3)
@@ -262,6 +267,7 @@ class QuadGaitController(object):
         self.current_gait = self.stand_gait
         self.current_gait.set_start_time(feedbacks.time_now)
         self.current_support_state = np.ones(self.n_leg)
+        self.current_support_phase = np.zeros(self.n_leg)
 
         self.current_robot_state.reset(
             feedbacks.body_pos, feedbacks.body_vel,
@@ -291,6 +297,7 @@ class QuadGaitController(object):
             self.kin_model.get_tip_state_world()[0])
 
         tip_init_pos, _ = self.kin_model.get_tip_state_world()
+        self.terrn_estm.reset(tip_init_pos)
         self.foothold_planner.init_footholds(tip_init_pos)
 
         self.last_body_euler_ypr = body_euler
@@ -386,6 +393,8 @@ class QuadGaitController(object):
         self.current_gait.set_current_time(time_now)
         self.current_support_state = \
             self.current_gait.get_current_support_state()
+        self.current_support_phase = \
+            self.current_gait.get_current_support_time_ratio_all()[0]
 
         self.kin_model.update_leg(
             self.current_robot_state.jnt_pos, self.current_robot_state.jnt_vel
@@ -396,10 +405,13 @@ class QuadGaitController(object):
             body_gyr = self.Rs_bcs @ feedbacks.snsr_gyr
             body_acc = self.Rs_bcs @ feedbacks.snsr_acc 
             self.state_estm.update(self.kin_model,
-                                body_gyr, body_acc,
-                                feedbacks.jnt_act_pos, feedbacks.jnt_act_vel,
-                                self.jnt_ref_trq_final, self.current_support_state,
-                                self.current_gait.get_current_support_time_ratio_all()[0])
+                                   body_gyr, 
+                                   body_acc,
+                                   feedbacks.jnt_act_pos, 
+                                   feedbacks.jnt_act_vel,
+                                   self.jnt_ref_trq_final, 
+                                   self.current_support_state,
+                                   self.current_support_phase)
             
             # TODO: when using state estimator's result, 
             # the foothold planning should be adjusted for consistent body height.
@@ -424,6 +436,12 @@ class QuadGaitController(object):
         )
         self.tip_act_pos, self.tip_act_vel = \
             self.kin_model.get_tip_state_world()
+        
+        # terrain estimation
+        self.terrn_estm.update(self.tip_act_pos, self.current_support_phase)
+        (bp_p, bh) = self.terrn_estm.get_point_projection(
+                    self.current_robot_state.body_pos, np.array([0, 0, -1.]))
+        print('body height=', bh)
 
     
     def trajectory_planning(self):
