@@ -439,9 +439,6 @@ class QuadGaitController(object):
         
         # terrain estimation
         self.terrn_estm.update(self.tip_act_pos, self.current_support_phase)
-        (bp_p, bh) = self.terrn_estm.get_point_projection(
-                    self.current_robot_state.body_pos, np.array([0, 0, -1.]))
-        print('body height=', bh)
 
     
     def trajectory_planning(self):
@@ -453,12 +450,14 @@ class QuadGaitController(object):
         self.body_planner.update_ref_state(
             filtered_vel_cmd, 
             self.current_robot_state.body_pos, 
-            self.current_robot_state.body_orn)
+            self.current_robot_state.body_orn,
+            self.terrn_estm.get_plane())
 
         # calculate foothold for legs
         self.foothold_planner.set_current_state(
             self.tip_act_pos, 
-            self.current_support_state)
+            self.current_support_state,
+            self.terrn_estm.get_plane())
 
         self.foothold_planner.calculate_next_footholds(
             self.current_robot_state.body_pos,

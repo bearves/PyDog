@@ -115,7 +115,13 @@
     - Integrate state estimation to gait controller 
       - Integrating(DONE)
       - Add log for estimated data analysis(DONE)
-      - Modify foothold height according to body state and ground height(Ongoing)
+      - Modify foothold height according to body state and ground height(Done)
+    - Simplified body state estimator (MIT's version)
+      - Remove estimation of body orientation, just use IMU's output (Ongoing)
 
 14.  Terrain slope estimation and body adaption
+    - Implement ground plane estimator (DONE)
+    - Modify foothold height according to body state and ground height(Done)
+    - Modify body height according to body state and ground height(Done)
+    - Modify body orientation and future trajectory according to ground slope (Ongoing)
 

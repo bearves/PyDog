@@ -16,9 +16,20 @@ class BodyTrjPlanner(object):
     ref_body_orn:    np.ndarray = np.array([0, 0, 0, 1])
     ref_body_vel:    np.ndarray = np.zeros(3)
     ref_body_angvel: np.ndarray = np.zeros(3)
+    ref_body_height: float = 0.3
+
+    # ground plane parameters
+    # the ground plane is described as 
+    #    ax + by + cz + d = 0
+    # where n = (a,b,c) is the normal vector, |n| = 1
+    ground_normal: np.ndarray = np.array([0, 0, 1])
+    ground_d: float           = 0
 
     # Velocity command
     vel_cmd: np.ndarray = np.zeros(3)
+
+    # useful constants
+    vec_unit_z: np.ndarray = np.array([0, 0, 1])
 
 
     def __init__(self, dt: float):
@@ -35,7 +46,8 @@ class BodyTrjPlanner(object):
                       body_pos: np.ndarray,
                       body_orn: np.ndarray,
                       body_vel: np.ndarray,
-                      body_angvel: np.ndarray):
+                      body_angvel: np.ndarray,
+                      ):
         """
             Set reference states of the body.
 
@@ -49,12 +61,14 @@ class BodyTrjPlanner(object):
         self.ref_body_orn = body_orn.copy()
         self.ref_body_vel = body_vel.copy()
         self.ref_body_angvel = body_angvel.copy()
+        self.ref_body_height = 0.3
 
 
     def update_ref_state(self, 
                          vel_cmd_wcs: np.ndarray, 
                          act_body_pos: np.ndarray, 
-                         act_body_orn: np.ndarray):
+                         act_body_orn: np.ndarray,
+                         ground_plane: tuple[np.ndarray, float]):
         """
             Integrate body reference states according to the received velocity command.
 
@@ -62,14 +76,23 @@ class BodyTrjPlanner(object):
                 vel_cmd_wcs  (array(3)): velocity command in WCS, defined as [v_x, v_y, thetadot_z].
                 act_body_pos (array(3)): current body position in WCS.
                 act_body_orn (array(4)): current body orientation as quaternion in WCS. 
+                ground_plane (tuple(array(3), float)): the normal and d parameter of current ground plane. 
         """
+        # update velocity command
         self.vel_cmd = vel_cmd_wcs.copy()
+
+        # update ground
+        self.ground_normal = ground_plane[0].copy()
+        self.ground_d = ground_plane[1]
         
         self.ref_body_vel[0:2] = self.vel_cmd[0:2]
-        self.ref_body_vel[2] = 0 # currently, robot height is invariant
+        self.ref_body_vel[2] = 0 
 
         # correct drift in X and Y
         self.ref_body_pos[0:2] = act_body_pos[0:2]
+        # correct drift in Z, hold ref body height according to the ground plane
+        proj_pt, _ = plane_projection(self.ground_normal, self.ground_d, self.ref_body_pos, self.vec_unit_z)
+        self.ref_body_pos = proj_pt + self.ref_body_height * self.vec_unit_z
 
         self.ref_body_angvel[0:2] = np.zeros(2) # currently, always let rx and ry be zero.
         self.ref_body_angvel[2] = self.vel_cmd[2]
@@ -131,6 +154,13 @@ class FootholdPlanner(object):
     # support state at last time step, this is used for detecting liftup and touchdown events
     last_support_state:    np.ndarray = np.ones(n_leg)      
 
+    # ground plane's normal and d parameter
+    # the ground plane is described as 
+    #    ax + by + cz + d = 0
+    # where n = (a,b,c) is the normal vector, |n| = 1
+    ground_normal: np.ndarray = np.array([0, 0, 1])
+    ground_d: float           = 0
+
 
     def __init__(self):
         """
@@ -154,13 +184,15 @@ class FootholdPlanner(object):
 
     def set_current_state(self, 
                           r_leg: np.ndarray, 
-                          support_state: np.ndarray):
+                          support_state: np.ndarray,
+                          ground_plane: tuple[np.ndarray, float]):
         """
             Update current states for foothold planner.
 
             Parameters:
                 r_leg (array(n_leg * 3)): current leg tip position in WCS.
                 support_state (array(n_leg)): current support state.
+                ground_plane (tuple(array(3), float)): the normal and d parameter of current ground plane. 
         """
         self.current_leg_pos = r_leg.copy()
         self.last_support_state = self.current_support_state.copy()
@@ -175,6 +207,10 @@ class FootholdPlanner(object):
             # if lft event, update liftup footpos use current leg pos at liftup moment
             if self.last_support_state[i] == 1 and self.current_support_state[i] == 0:
                 self.liftup_leg_pos[0+i*3:3+i*3] = self.current_leg_pos[0+i*3:3+i*3]
+        
+        # update ground parameters
+        self.ground_normal = ground_plane[0].copy()
+        self.ground_d = ground_plane[1]
 
 
     def calculate_next_footholds(self,
@@ -184,7 +220,8 @@ class FootholdPlanner(object):
                                  body_des_vel_cmd: np.ndarray,
                                  t_swing_left: np.ndarray,
                                  t_stance_all: np.ndarray,
-                                 hip_pos_wrt_body: np.ndarray):
+                                 hip_pos_wrt_body: np.ndarray
+                                 ):
         """
             Calculate next foothold according to current robot states.
 
@@ -221,7 +258,7 @@ class FootholdPlanner(object):
             vxw = np.array([body_vel_now[1], -body_vel_now[0]]) * body_des_yawdot # v_now x omega_des_z
             bh = body_pos_now[2] - np.mean(self.current_footholds[2::3])
 
-            # finally, predict next foothold based on Raibert's law, with centrifugal compensation
+            # fourthly, predict next foothold based on Raibert's law, with centrifugal compensation
             #
             #  p_next = p_h + Tst/2*v_now + k*(v_des-v_now) + 1/2*(bh/g)*(v_now x omega_des_z)
             #
@@ -230,8 +267,15 @@ class FootholdPlanner(object):
                 t_stance_all[leg] * 0.5 * body_vel_now[0:2] + \
                 k * (body_vel_now[0:2] - body_des_vel_cmd[0:2]) + \
                 0.5 * bh/9.81 * vxw
+
+            # finally, calculate the projection point of the next foothold on the ground plane
+            ground_point, _ = plane_projection(self.ground_normal,
+                                               self.ground_d,
+                                               self.next_footholds[0+leg*3:3+leg*3],
+                                               [0, 0, -1])
             # slightly below ground, considering the foot size
-            self.next_footholds[2+leg*3] = 0.0159
+            print(ground_point[2])
+            self.next_footholds[2+leg*3] = ground_point[2] - 0.004
 
 
     def predict_future_foot_pos(self,
@@ -384,3 +428,33 @@ class SwingTrjPlanner(object):
                       self.step_height * math.sin(math.pi * pivot) * (math.pi * pivotdot)**2
 
         return tip_pos, tip_vel, tip_acc
+
+
+#####################################
+#    Helper function
+#####################################
+def plane_projection(plane_n: np.ndarray,
+                     plane_d: float,
+                     point: np.ndarray, 
+                     vector: np.ndarray) -> tuple[np.ndarray, float]:
+    """
+        Get the projection of a given point to a plane, alone a vector.
+        The plane in the 3D space is described using the following equation:
+            ax + by + cz + d = 0,
+        where n = (a,b,c) is the plane's normal vector, |n| = 1.
+
+        Parameters:
+            plane_n (array(3)): normal of the plane.
+            plane_d (float): d coefficient of the plane.
+            point (array(3)): the given point.
+            vector (array(3)): the vector of the projection direction.
+
+        Returns:
+            p_proj (array(3)): the point on the plane, projected by the given point.
+            h (float): the distance from the given point to the projected point.
+    """
+    vector = vector / np.linalg.norm(vector)
+    b = np.dot(plane_n, point) + plane_d
+    h = -b / np.dot(plane_n, vector)
+    p_proj = point + h * vector
+    return (p_proj, h)
