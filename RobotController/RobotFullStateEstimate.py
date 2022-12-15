@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as rot
 import scipy.linalg
 from RobotController import RobotKinematics as rkin
 
-class QuadStateEstimator(object):
+class QuadFullStateEstimator(object):
 
     """
         Implementation of a EKF-based state estimator for quadruped robot.
@@ -412,7 +412,6 @@ class QuadStateEstimator(object):
                 trust = 0.0
         # TODO: take consideration of the leg force
         return self.Qpst * trust + self.Qpsw * (1-trust)
-
 
 
 ###########################################

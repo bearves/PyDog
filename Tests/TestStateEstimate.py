@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from scipy.linalg import expm
 from scipy.spatial.transform import Rotation as rot
 from RobotController import RobotKinematics as rkin
-from RobotController import RobotStateEstimate as rse
+from RobotController import RobotFullStateEstimate as rse
 
 
 dt = 1/100.
@@ -26,7 +26,7 @@ jnt_pos = np.array([-0.0, 0.75, -1.3,
 kin = rkin.RobotKineticModel()
 kin.update_leg(jnt_pos, np.zeros(12))
 
-est = rse.QuadStateEstimator(0.001)
+est = rse.QuadFullStateEstimator(0.001)
 est.reset_state(np.array([0, 0, 1.]), np.zeros(3), np.array([0,0,0,1.]), kin.get_tip_state_world()[0])
 
 est.update(kin,

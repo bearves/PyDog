@@ -274,7 +274,6 @@ class FootholdPlanner(object):
                                                self.next_footholds[0+leg*3:3+leg*3],
                                                [0, 0, -1])
             # slightly below ground, considering the foot size
-            print(ground_point[2])
             self.next_footholds[2+leg*3] = ground_point[2] - 0.004
 
 

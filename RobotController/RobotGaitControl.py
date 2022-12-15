@@ -4,7 +4,8 @@ from scipy.spatial.transform import Rotation as rot
 
 from RobotController.RobotKinematics import RobotKineticModel
 from RobotController.RobotDynamics import RobotDynamicModel, JointOrderMapper
-from RobotController.RobotStateEstimate import QuadStateEstimator
+from RobotController.RobotFullStateEstimate import QuadFullStateEstimator
+from RobotController.RobotPosVelEstimate import QuadPosVelEstimator
 from RobotController.RobotTerrainEstimate import QuadTerrainEstimator
 from RobotController.GaitPatternGenerator import GaitPatternGenerator
 from RobotController.RobotTrjPlanner import BodyTrjPlanner, FootholdPlanner, SwingTrjPlanner
@@ -125,7 +126,8 @@ class QuadGaitController(object):
 
     # state estimator
     Rs_bcs: np.ndarray # Rotation matrix of the sensor measurement frame, w.r.t. body cs
-    state_estm: QuadStateEstimator
+    # state_estm: QuadFullStateEstimator
+    state_estm: QuadPosVelEstimator
     terrn_estm: QuadTerrainEstimator
 
     # trj planners
@@ -191,7 +193,7 @@ class QuadGaitController(object):
 
         # flying trot
         self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
-            [0, 0.5, 0.5, 0]), np.array([0.35, 0.35, 0.35, 0.35]))
+            [0, 0.5, 0.5, 0]), 0.35 * np.array([1, 1, 1, 1]))
         # walking trot
         #self.trot_gait = GaitPatternGenerator('trot', 0.5, np.array(
         #    [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
@@ -211,7 +213,8 @@ class QuadGaitController(object):
 
         # setup state estimator
         self.Rs_bcs = Rs_bcs
-        self.state_estm = QuadStateEstimator(self.dt)
+        # self.state_estm = QuadFullStateEstimator(self.dt)
+        self.state_estm = QuadPosVelEstimator(self.dt)
         self.terrn_estm = QuadTerrainEstimator()
 
         # setup trajectory planners
@@ -404,7 +407,10 @@ class QuadGaitController(object):
         if self.use_se:
             body_gyr = self.Rs_bcs @ feedbacks.snsr_gyr
             body_acc = self.Rs_bcs @ feedbacks.snsr_acc 
+            # if use PosVel Estimator, the body orn from feedbacks should be passed to the estimator
+            # if use FullState Estimator, don't pass the body orn to the estimator 
             self.state_estm.update(self.kin_model,
+                                   feedbacks.body_orn,
                                    body_gyr, 
                                    body_acc,
                                    feedbacks.jnt_act_pos, 
