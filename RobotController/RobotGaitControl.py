@@ -43,8 +43,10 @@ class QuadRobotCommands(object):
     """
         Control commands from the operator
     """
-    gait_switch   : bool = False                   # flag whether the user asks to switch gait
-    direction_flag: list[int] = [0, 0, 0, 0, 0, 0] # flags whether a movement direction is required, see DirectionFlag in RobotSteer.py
+    # flag whether the user asks to switch gait
+    gait_switch   : bool = False                   
+    # flags whether a movement direction is required, see DirectionFlag in RobotSteer.py
+    direction_flag: list[int] = [0, 0, 0, 0, 0, 0] 
 
 
 class QuadControlOutput(object):
@@ -166,7 +168,14 @@ class QuadGaitController(object):
     jnt_ref_trq_wbic:  np.ndarray
     jnt_ref_trq_final: np.ndarray
 
-    def __init__(self, dt: float, leap: int, urdf_file: str, mesh_dir: str, use_mpc: bool, use_se: bool, Rs_bcs: np.ndarray) -> None:
+    def __init__(self, 
+                 dt: float, 
+                 leap: int, 
+                 urdf_file: str, 
+                 mesh_dir: str, 
+                 use_mpc: bool, 
+                 use_se: bool, 
+                 Rs_bcs: np.ndarray) -> None:
         """
             Create quadruped robot gait controller.
 
@@ -661,14 +670,6 @@ class QuadGaitController(object):
         """
         # get body euler angles
         body_euler_ypr = rot.from_quat(self.current_robot_state.body_orn).as_euler('ZYX')
-        # prevent euler angle range skip
-        # if body_euler_ypr[0] - self.last_body_euler_ypr[0] < -6.1:
-        #    body_euler_ypr[0] = body_euler_ypr[0] + 2*np.pi
-        #    print('Euler angle jump')
-        #elif body_euler_ypr[0] - self.last_body_euler_ypr[0] > 6.1:
-        #    body_euler_ypr[0] = body_euler_ypr[0] - 2*np.pi
-        #    print('Euler angle jump')
-        
         self.last_body_euler_ypr = body_euler_ypr
 
         current_state = np.ones(13) # current state for MPC
