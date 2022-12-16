@@ -92,9 +92,14 @@ class BodyTrjPlanner(object):
         self.ground_normal = ground_plane[0].copy()
         self.ground_d = ground_plane[1]
         
-        # TODO: currently, the ref vel is horizontal, it can be turned to be parallel with the ground
+        # Set horizontal ref vel
         self.ref_body_vel[0:2] = self.vel_cmd[0:2]
-        self.ref_body_vel[2] = 0 
+        self.ref_body_vel[2] = 0
+        vel_mag = np.linalg.norm(self.ref_body_vel)
+        # turn the ref vel parallel with the ground 
+        if vel_mag > 1e-2:
+            Rv = plane_rotation(self.ground_normal, self.ref_body_vel)
+            self.ref_body_vel = vel_mag * Rv[:, 0]
 
         # correct drift in X and Y
         self.ref_body_pos[0:2] = act_body_pos[0:2]
@@ -118,11 +123,13 @@ class BodyTrjPlanner(object):
         """
         # correct drift in Yaw
         yaw = rot.from_quat(act_body_orn).as_euler('ZYX')[0]
+        x0 = np.array([math.cos(yaw), math.sin(yaw), 0])
         # get pitch and roll from terrain slope estimation 
-        gnd_roll, gnd_pitch, _ = plane_roll_pitch(self.ground_normal, yaw)
+        R = plane_rotation(self.ground_normal, x0)
+        euler_ypr = rot.from_matrix(R).as_euler('ZYX')
         # filter roll and pitch due to possible jumps of terrain slope estimation
-        self.ref_roll = self.filter_k * self.ref_roll + (1 - self.filter_k) * gnd_roll
-        self.ref_pitch = self.filter_k * self.ref_pitch + (1 - self.filter_k) * gnd_pitch
+        self.ref_roll = self.filter_k * self.ref_roll + (1 - self.filter_k) * euler_ypr[2]
+        self.ref_pitch = self.filter_k * self.ref_pitch + (1 - self.filter_k) * euler_ypr[1]
         self.ref_body_orn = rot.from_euler('ZYX', [yaw, self.ref_pitch, self.ref_roll]).as_quat()
 
 
@@ -481,28 +488,23 @@ def plane_projection(plane_n: np.ndarray,
     return (p_proj, h)
 
 
-def plane_roll_pitch(plane_n: np.ndarray,
-                     yaw: float) -> tuple[float, float, np.ndarray]:
+def plane_rotation(plane_normal: np.ndarray,
+                   heading_vec: np.ndarray) -> np.ndarray:
     """
-        Get the roll and pitch angle of the rigid body that is parallel to the ground plane, 
-        according to the rigid body's heading yaw angle.
+        Get the rotation matrix of the frame that is parallel to the ground plane, 
+        given the frame's heading vector. The heading vector is the projected vector
+        of the frame's x axis to the world's XY plane.
 
         Parameters:
-            plane_n (array(3)): normal of the plane.
-            yaw (float): rigid body's yaw angle.
+            plane_normal (array(3)): normal of the plane.
+            heading_vec  (array(3)): frame's heading vector.
 
         Returns:
-            tuple(roll, pitch, Rb):
-            roll  (float): the rigid body's roll angle.
-            pitch (float): the rigid body's pitch angle
-            Rb    (array(3x3)): the rigid body's rotation matrix, w.r.t. WCS.
-
+            R    (array(3x3)): the frame's rotation matrix, w.r.t. WCS.
     """
-    x0 = np.array([math.cos(yaw), math.sin(yaw), 0])
-    uz = plane_n/np.linalg.norm(plane_n)
-    uy = np.cross(uz, x0)
+    uz = plane_normal/np.linalg.norm(plane_normal)
+    uy = np.cross(uz, heading_vec)
     uy = uy/np.linalg.norm(uy)
     ux = np.cross(uy, uz)
-    Rb = np.vstack((ux, uy, uz)).T
-    euler_ypr = rot.from_matrix(Rb).as_euler('ZYX')
-    return euler_ypr[2], euler_ypr[1], Rb
+    R = np.vstack((ux, uy, uz)).T
+    return R

@@ -117,11 +117,12 @@
       - Add log for estimated data analysis(DONE)
       - Modify foothold height according to body state and ground height(Done)
     - Simplified body state estimator (MIT's version)
-      - Remove estimation of body orientation, just use IMU's output (Ongoing)
+      - Remove estimation of body orientation, just use IMU's output (Done)
 
 14.  Terrain slope estimation and body adaption
     - Implement ground plane estimator (DONE)
     - Modify foothold height according to body state and ground height(Done)
     - Modify body height according to body state and ground height(Done)
-    - Modify body orientation and future trajectory according to ground slope (Ongoing)
+    - Modify body orientation and future trajectory according to ground slope (Done)
+    - Adjust reference body height according to the ground slope (Ongoing)
 

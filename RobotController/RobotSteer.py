@@ -112,11 +112,13 @@ class RobotSteer(object):
             self.vel_cmd_local[self.df_2_vc_index[df]] += self.df_2_vc_action[df] * self.direction_flag[df] * 0.1
         
         self.vel_cmd_local = np.clip(self.vel_cmd_local, -self.max_vel_cmd, self.max_vel_cmd)
-        self.vel_cmd_local *= 0.99 # if no key cmd, decay to zero
+
+        if (np.sum(np.array(self.direction_flag)) == 0):
+            self.vel_cmd_local *= 0.9 # if no key cmd, decay to zero
 
         # filter 
-        phi = 0.01
-        self.vel_cmd_local_filtered = (1. - phi) * self.vel_cmd_local_filtered + phi * self.vel_cmd_local
+        phi = np.diag([0.99, 0.99, 0.9])
+        self.vel_cmd_local_filtered = phi @ self.vel_cmd_local_filtered + (np.eye(3) - phi) @ self.vel_cmd_local
 
         # transform from body cs to wcs
         yaw = rot.from_quat(body_orn).as_euler('ZYX')[0]
