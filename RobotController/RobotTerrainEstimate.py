@@ -8,11 +8,15 @@ class QuadTerrainEstimator(object):
 
     # constants
     n_leg: int = 4   # number of robot legs
-    n_step: int = 2  # number of steps for ground estimation, the bigger n_step, the slower ground plane changes. 
+
+    # number of steps for ground estimation, 
+    # the bigger is n_step, the slower ground plane changes, 
+    # and the more robust but less adaptive of the robot.
+    n_step: int = 1 
     
     # states
     gnd_pts: np.ndarray     # tip position when the leg tip is on the ground 
-    search_flag: np.ndarray # a flag indicating where to search a grounded point during a step
+    search_flag: np.ndarray # a flag indicating whether to search a grounded point during a step
 
     # ground plane fitting helper matrices
     A: np.ndarray    # matrix holding all grounded points for fitting
@@ -86,8 +90,9 @@ class QuadTerrainEstimator(object):
         """
         self.A = self.gnd_pts.T.reshape((self.n_leg * self.n_step, 3), order='C')
         center = np.mean(self.A, axis=0)
-        result = np.linalg.svd(self.A - center)
-        normal = result[2][:, 2]
+        u, s, vh = np.linalg.svd(self.A - center) # numpy's svd is different from matlab's
+        v = vh.T
+        normal = v[:, 2]
         normal = normal / np.linalg.norm(normal)
         if (normal[2] < 0):
             normal *= -1.
@@ -96,10 +101,10 @@ class QuadTerrainEstimator(object):
         self.plane_normal = normal.copy()
         self.plane_d = d
         
-        #print('New terrain estimated:', self.get_plane_normal())
-        #if (self.get_plane_normal()[2] < 0.6):
-        #    print('Strange result:')
-        #    print(self.gnd_pts)
+        # print('New terrain estimated:', self.get_plane_normal())
+        # if (self.get_plane_normal()[2] < 0.6):
+        #     print('Strange result:')
+        #     print(self.gnd_pts)
 
 
     def get_plane_normal(self) -> np.ndarray:

@@ -17,6 +17,10 @@ class BodyTrjPlanner(object):
     ref_body_vel:    np.ndarray = np.zeros(3)
     ref_body_angvel: np.ndarray = np.zeros(3)
     ref_body_height: float = 0.3
+    ref_pitch: float = 0
+    ref_roll: float = 0
+    
+    filter_k: float = 0.9  # the 1st order filter coefficient for terrain roll and pitch filtering
 
     # ground plane parameters
     # the ground plane is described as 
@@ -62,6 +66,9 @@ class BodyTrjPlanner(object):
         self.ref_body_vel = body_vel.copy()
         self.ref_body_angvel = body_angvel.copy()
         self.ref_body_height = 0.3
+        self.ref_pitch = 0
+        self.ref_roll = 0
+        self.filter_k = 0.7
 
 
     def update_ref_state(self, 
@@ -85,6 +92,7 @@ class BodyTrjPlanner(object):
         self.ground_normal = ground_plane[0].copy()
         self.ground_d = ground_plane[1]
         
+        # TODO: currently, the ref vel is horizontal, it can be turned to be parallel with the ground
         self.ref_body_vel[0:2] = self.vel_cmd[0:2]
         self.ref_body_vel[2] = 0 
 
@@ -92,16 +100,30 @@ class BodyTrjPlanner(object):
         self.ref_body_pos[0:2] = act_body_pos[0:2]
         # correct drift in Z, hold ref body height according to the ground plane
         proj_pt, _ = plane_projection(self.ground_normal, self.ground_d, self.ref_body_pos, self.vec_unit_z)
-        self.ref_body_pos = proj_pt + self.ref_body_height * self.vec_unit_z
+        ideal_body_pos = proj_pt + self.ref_body_height * self.vec_unit_z
+        # filter body pos due to possible jumps of the terrain height estimation
+        self.ref_body_pos = self.filter_k * self.ref_body_pos + (1 - self.filter_k) * ideal_body_pos
 
         self.ref_body_angvel[0:2] = np.zeros(2) # currently, always let rx and ry be zero.
         self.ref_body_angvel[2] = self.vel_cmd[2]
 
-        # correct drift in Yaw, and keep Roll/Pitch zero at current stage
-        # pitch and roll will be set for terrain slope estimation in the future
+        self.set_ref_body_orn(act_body_orn)
+    
+
+    def set_ref_body_orn(self, act_body_orn: np.ndarray):
+        """
+            Set body's reference orientation according to the estimated terrain.
+
+            act_body_orn (array(4)): current body orientation as quaternion in WCS. 
+        """
+        # correct drift in Yaw
         yaw = rot.from_quat(act_body_orn).as_euler('ZYX')[0]
-        roll_0, pitch_0 = 0.0, 0.0
-        self.ref_body_orn = rot.from_euler('ZYX', [yaw,pitch_0,roll_0]).as_quat()
+        # get pitch and roll from terrain slope estimation 
+        gnd_roll, gnd_pitch, _ = plane_roll_pitch(self.ground_normal, yaw)
+        # filter roll and pitch due to possible jumps of terrain slope estimation
+        self.ref_roll = self.filter_k * self.ref_roll + (1 - self.filter_k) * gnd_roll
+        self.ref_pitch = self.filter_k * self.ref_pitch + (1 - self.filter_k) * gnd_pitch
+        self.ref_body_orn = rot.from_euler('ZYX', [yaw, self.ref_pitch, self.ref_roll]).as_quat()
 
 
     def predict_future_body_ref_traj(self,
@@ -457,3 +479,30 @@ def plane_projection(plane_n: np.ndarray,
     h = -b / np.dot(plane_n, vector)
     p_proj = point + h * vector
     return (p_proj, h)
+
+
+def plane_roll_pitch(plane_n: np.ndarray,
+                     yaw: float) -> tuple[float, float, np.ndarray]:
+    """
+        Get the roll and pitch angle of the rigid body that is parallel to the ground plane, 
+        according to the rigid body's heading yaw angle.
+
+        Parameters:
+            plane_n (array(3)): normal of the plane.
+            yaw (float): rigid body's yaw angle.
+
+        Returns:
+            tuple(roll, pitch, Rb):
+            roll  (float): the rigid body's roll angle.
+            pitch (float): the rigid body's pitch angle
+            Rb    (array(3x3)): the rigid body's rotation matrix, w.r.t. WCS.
+
+    """
+    x0 = np.array([math.cos(yaw), math.sin(yaw), 0])
+    uz = plane_n/np.linalg.norm(plane_n)
+    uy = np.cross(uz, x0)
+    uy = uy/np.linalg.norm(uy)
+    ux = np.cross(uy, uz)
+    Rb = np.vstack((ux, uy, uz)).T
+    euler_ypr = rot.from_matrix(Rb).as_euler('ZYX')
+    return euler_ypr[2], euler_ypr[1], Rb
