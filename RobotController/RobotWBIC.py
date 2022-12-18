@@ -67,6 +67,9 @@ class QuadWBIC(object):
         # run kinWBC
         dq, qdot, qddot = self.run_kinWBC(dyn_model, task_list)
 
+        # run WBIC
+        tau = self.run_WBIC(dyn_model, qddot, fr_mpc)
+
         # check joint range limitation
         new_q = dyn_model.q[7:7+nj] + dq[6:6+nj]
         for i in range(self.n_leg):
@@ -75,13 +78,12 @@ class QuadWBIC(object):
                     new_q[i*3 + j] = self.leg_jnt_range_max[j]
                     qdot[6 + i*3 + j] = 0
                     qddot[6 + i*3 + j] = 0
+                    tau[i*3 + j] = 0
                 elif new_q[i*3 + j] < self.leg_jnt_range_min[j]:
                     new_q[i*3 + j] = self.leg_jnt_range_min[j]
                     qdot[6 + i*3 + j] = 0
                     qddot[6 + i*3 + j] = 0
-
-        # run WBIC
-        tau = self.run_WBIC(dyn_model, qddot, fr_mpc)
+                    tau[i*3 + j] = 0
 
         # get results: 
         # q, qdot for joint PD control target (only for leg joints)

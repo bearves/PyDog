@@ -124,10 +124,9 @@ class RobotKineticModel(object):
 
         # update leg forward kinetics
         for i in range(self.n_leg):
-            idx = range(0+i*3, 3+i*3)
-            self.tip_pos_world_[idx] = body_pos + self.body_R_ @ self.tip_pos_body_[idx]
-            self.tip_vel_world_[idx] = body_vel + self.body_R_ @ self.tip_vel_body_[idx] + \
-                                       np.cross(body_angvel, self.body_R_ @ self.tip_pos_body_[idx])
+            self.tip_pos_world_[0+i*3: 3+i*3] = body_pos + self.body_R_ @ self.tip_pos_body_[0+i*3: 3+i*3]
+            self.tip_vel_world_[0+i*3: 3+i*3] = body_vel + self.body_R_ @ self.tip_vel_body_[0+i*3: 3+i*3] + \
+                                       np.cross(body_angvel, self.body_R_ @ self.tip_pos_body_[0+i*3: 3+i*3])
 
     
     def get_contact_jacobian_wcs(self, leg_id: int) -> np.ndarray:

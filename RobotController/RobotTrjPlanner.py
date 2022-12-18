@@ -16,11 +16,11 @@ class BodyTrjPlanner(object):
     ref_body_orn:    np.ndarray = np.array([0, 0, 0, 1])
     ref_body_vel:    np.ndarray = np.zeros(3)
     ref_body_angvel: np.ndarray = np.zeros(3)
-    ref_body_height: float = 0.3
+    ref_body_height: float
     ref_pitch: float = 0
     ref_roll: float = 0
     
-    filter_k: float = 0.9  # the 1st order filter coefficient for terrain roll and pitch filtering
+    filter_k: float  # the 1st order filter coefficient for terrain roll and pitch filtering
 
     # ground plane parameters
     # the ground plane is described as 

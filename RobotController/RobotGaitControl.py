@@ -632,7 +632,7 @@ class QuadGaitController(object):
             if self.current_support_state[leg] == 1:  # stance
                 kp, kd = 10, 1
             else:  # swing
-                kp, kd = 10, 1
+                kp, kd = 20, 0.5
 
         pos_err = self.jnt_ref_pos_wbic - self.current_robot_state.jnt_pos
         vel_err = self.jnt_ref_vel_wbic - self.current_robot_state.jnt_vel
