@@ -418,9 +418,9 @@ class QuadConvexMPC(object):
         """
             Reduce the scale of MPC problem and solve, must be called after all matrices have
              been updated. 
-            Since for the swinging legs, the leg tip force is always zero, we can remove these
-            optimizing variables from the MPC problem and reduce the size of Bbar, Rbar and Cbar.
-            Moreover, the equality constraints for the force of swinging legs is also removed. In 
+            Since for the swinging legs, the leg tip forces are always zero, we can remove these
+            optimizing variables from the MPC problem and reduce the sizes of Bbar, Rbar and Cbar.
+            Moreover, the equality constraints for the forces of swinging legs are also removed. In 
             this way, the solving performance can be largely improved. 
             
             Returns:
