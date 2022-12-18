@@ -38,13 +38,14 @@ class QuadConvexMPC(object):
     ck_list : np.ndarray = np.zeros((horizon_length, 6*n_leg, 1))
     Dk_list : np.ndarray = np.zeros((horizon_length, 3*n_leg, dim_u))
     dk_list : np.ndarray = np.zeros((horizon_length, 3*n_leg, 1))
-    n_support_list : np.ndarray = np.zeros(horizon_length, dtype=int)
-    n_swing_list : np.ndarray = np.zeros(horizon_length, dtype=int)
+    n_support_list : np.ndarray = np.zeros(horizon_length, dtype=int) # number of legs in supporting in the horizon
+    n_swing_list : np.ndarray = np.zeros(horizon_length, dtype=int)   # number of legs in swinging in the horizon
 
     # system ref states and actual states
     x0 : np.ndarray = np.zeros(dim_s)  # current state
     x_ref_seq : np.ndarray = np.zeros((horizon_length, dim_s)) # future reference states
     X_ref : np.ndarray = np.zeros(horizon_length * dim_s)      # flattened future reference states
+    support_state_seq: np.ndarray = np.zeros((horizon_length, n_leg))  # future leg support states
 
     # MPC super matrices
     Abar : np.ndarray = np.zeros((horizon_length*dim_s, dim_s))
@@ -117,7 +118,7 @@ class QuadConvexMPC(object):
                 x_{k+1} = Ak xk + Bk uk
                 s.t.
                     Ck uk < ck
-                    Dk uk < dk
+                    Dk uk = dk
             
             Parameters:
                 body_euler_seq (array(horizon_length, 3)) : 
@@ -133,8 +134,9 @@ class QuadConvexMPC(object):
                     sequence of the reference robot state in the predictive horizon.
         """
 
-        self.x0 = x0
-        self.x_ref_seq = x_ref_seq
+        self.x0 = x0.copy()
+        self.x_ref_seq = x_ref_seq.copy()
+        self.support_state_seq = support_state_seq.copy()
 
         body_pos = self.x0[3:6]
 
@@ -212,10 +214,6 @@ class QuadConvexMPC(object):
         # build X_ref
         for i in range(hz):
             self.X_ref[0+i*dim_s:dim_s+i*dim_s] = self.x_ref_seq[i, :]
-
-        # build H and G
-        self.H = self.Rbar + self.Bbar.T @ self.Qbar @ self.Bbar
-        self.G = (self.Abar @ self.x0 - self.X_ref).T @ self.Qbar @ self.Bbar
 
 
     def cal_state_equation(self,    
@@ -298,6 +296,7 @@ class QuadConvexMPC(object):
 
         return Ak, Bk
 
+
     def cal_friction_constraint(self, support_state: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
         """
             Generate inequality constraints that obey the friction physics
@@ -349,6 +348,7 @@ class QuadConvexMPC(object):
                 cnt = cnt+1
         return C, rhs, int(n_support)
 
+
     def cal_swing_force_constraints(self, support_state : np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
         """
             Generate equality constraints for this moment to restrict the 
@@ -392,6 +392,7 @@ class QuadConvexMPC(object):
             cnt = cnt+1
         return D, rhs, n_swing
 
+
     def solve(self) -> np.ndarray:
         """
             Solve MPC problem for quadruped robot, must be called after all
@@ -401,9 +402,53 @@ class QuadConvexMPC(object):
                 u_mpc(array(n_leg*3, horizon_length)) :
                     predicted optimal input of the system, i.e. the leg tip force in WCS.
         """
+        # build H and G
+        self.H = self.Rbar + self.Bbar.T @ self.Qbar @ self.Bbar
+        self.G = (self.Abar @ self.x0 - self.X_ref).T @ self.Qbar @ self.Bbar
+
         res = qpsolvers.solve_qp(P=self.H, q=self.G.flatten(),
                                  A=self.Dbar, b=self.dbar.flatten(),
                                  G=self.Cbar, h=self.cbar.flatten(),
                                  solver="quadprog")
         u_mpc = np.reshape(res, (self.dim_u, self.horizon_length), order='F')
+        return u_mpc
+
+
+    def reduce_solve(self) -> np.ndarray:
+        """
+            Reduce the scale of MPC problem and solve, must be called after all matrices have
+             been updated. 
+            Since for the swinging legs, the leg tip force is always zero, we can remove these
+            optimizing variables from the MPC problem and reduce the size of Bbar, Rbar and Cbar.
+            Moreover, the equality constraints for the force of swinging legs is also removed. In 
+            this way, the solving performance can be largely improved. 
+            
+            Returns:
+                u_mpc(array(n_leg*3, horizon_length)) :
+                    predicted optimal input of the system, i.e. the leg tip force in WCS.
+        """
+        # select all non-zero inputs, which are the tip forces of supporting legs
+        leg_idx = np.where(self.support_state_seq.flatten(order='C') > 0.7)[0]
+        u_idx = np.vstack((leg_idx*3,leg_idx*3+1,leg_idx*3+2)).flatten(order='F')
+
+        # reduce problem
+        Breduce = self.Bbar[:, u_idx]
+        Rreduce = self.Rbar[:, u_idx]
+        Rreduce = Rreduce[u_idx, :]
+        Creduce = self.Cbar[:, u_idx]
+
+        # build H and G
+        Hreduce = Rreduce + Breduce.T @ self.Qbar @ Breduce
+        Greduce = (self.Abar @ self.x0 - self.X_ref).T @ self.Qbar @ Breduce
+
+        # solve
+        res_reduce = qpsolvers.solve_qp(P=Hreduce, q=Greduce.flatten(),
+                                        A=None, b=None,
+                                        G=Creduce, h=self.cbar.flatten(),
+                                        solver="quadprog")
+
+        # map back results
+        res_all = np.zeros(self.horizon_length * self.dim_u)
+        res_all[u_idx] = res_reduce
+        u_mpc = np.reshape(res_all, (self.dim_u, self.horizon_length), order='F')
         return u_mpc

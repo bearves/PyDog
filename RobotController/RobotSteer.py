@@ -108,13 +108,16 @@ class RobotSteer(object):
         """
         
         # update vel cmd
+        vel_decay_mask = [0, 0, 0]
         for df in range(6):
             self.vel_cmd_local[self.df_2_vc_index[df]] += self.df_2_vc_action[df] * self.direction_flag[df] * 0.1
+            vel_decay_mask[self.df_2_vc_index[df]] += self.direction_flag[df]
         
         self.vel_cmd_local = np.clip(self.vel_cmd_local, -self.max_vel_cmd, self.max_vel_cmd)
 
-        if (np.sum(np.array(self.direction_flag)) == 0):
-            self.vel_cmd_local *= 0.9 # if no key cmd, decay to zero
+        for i in range(3):
+            if vel_decay_mask[i] == 0:
+                self.vel_cmd_local[i] *= 0.9 # if no key cmd on this direction, decay to zero
 
         # filter 
         phi = np.diag([0.99, 0.99, 0.9])

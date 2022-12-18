@@ -535,7 +535,9 @@ class QuadGaitController(object):
             support_state_future_traj, current_state,
             body_ref_traj)
         self.mpc.update_super_matrices()
-        self.u_mpc = self.mpc.solve()
+        #self.u_mpc = self.mpc.solve()
+        self.u_mpc = self.mpc.reduce_solve()
+        #print(np.linalg.norm(self.u_mpc - self.u_mpc_2))
 
 
     def solve_vmc(self):

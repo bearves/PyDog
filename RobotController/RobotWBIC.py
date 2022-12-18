@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import solve
 import qpsolvers
 import RobotController.RobotDynamics as rdyn
 import RobotController.RobotTask as rtask
@@ -190,14 +191,12 @@ class QuadWBIC(object):
 
         # task execution to obtain qddot, different pseudo-inverse is used
         H = dyn_model.get_mass_mat()
+        Hinv = solve(H, np.eye(dyn_model.nv), assume_a='pos') # mass matrix is positive definite
         Nlast = np.eye(nv)
         qddot = np.zeros(nv)
 
-        if Jc is None:
-            Nlast = np.eye(nv)
-            qddot = np.zeros(nv)
-        else:
-            JcBar = self.dynConInv(Jc, H)
+        if Jc is not None:
+            JcBar = self.dyn_con_inv(Jc, Hinv)
             qddot = JcBar @ -dyn_model.get_contact_jcdqd_or_none()
             Nlast = np.eye(nv) - JcBar @ Jc
 
@@ -205,7 +204,7 @@ class QuadWBIC(object):
             Jt = task.get_jacobian()
             Jtdqd = task.get_jdqd()
             Jtpre = Jt @ Nlast
-            JtpreBar = self.dynConInv(Jtpre, H)
+            JtpreBar = self.dyn_con_inv(Jtpre, Hinv)
             qddot += JtpreBar @ (task.get_acc_des() - Jtdqd - Jt @ qddot)
             Nlast = Nlast @ (np.eye(nv) - JtpreBar @ Jtpre)
 
@@ -418,7 +417,7 @@ class QuadWBIC(object):
         return self.tau_joint_result
 
     
-    def dynConInv(self, J: np.ndarray, H: np.ndarray) -> np.ndarray:
+    def dyn_con_inv(self, J: np.ndarray, Hinv: np.ndarray) -> np.ndarray:
         """
             Calculate the dynamic consistent pseudo-inverse of J, with the given mass matrix H, 
 
@@ -426,11 +425,11 @@ class QuadWBIC(object):
 
             Parameters:
                 J : Jacobian matrix.
-                H : Mass matrix of the dynamic model.
+                HInv : Inverse of the mass matrix of the dynamic model.
             Returns:
                 JBar: The dynamic consistent pseudo-inverse of J.
         """
-        HInv = np.linalg.inv(H)
-        JBar = HInv @ J.T @ np.linalg.pinv(J @ HInv @ J.T)
+        JBar = Hinv @ J.T @ np.linalg.pinv(J @ Hinv @ J.T)
+
         return JBar
 

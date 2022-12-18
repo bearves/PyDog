@@ -1,6 +1,7 @@
 import sys,os
 sys.path.append(os.getcwd()+'/..')
 import numpy as np
+import qpsolvers
 from scipy.spatial.transform import Rotation as Rot
 
 from RobotController import RobotMPC as ctrl
@@ -45,7 +46,7 @@ for i in range(mpc.horizon_length):
                                  0.183,  0.047, 0,
                                 -0.183, -0.047, 0,
                                 -0.183,  0.047, 0])
-    support_state_list[i, :] = np.array([1,1,1,1])
+    support_state_list[i, :] = np.array([1,0,0,1])
     x_ref_list[i, :] = np.array([0,0,0,
                                  0,0,0,
                                  0,0,0,
@@ -61,9 +62,11 @@ mpc.update_super_matrices()
 #print(mpc.Cbar.shape)
 
 #print(mpc.H)
-#print(mpc.G)
-
-
 u_mpc = mpc.solve()
 print('Result:')
 print(u_mpc[:, 0])
+
+u_mpc_all = mpc.reduce_solve()
+print('Result:')
+print(u_mpc_all[:, 0])
+print(np.linalg.norm(u_mpc_all - u_mpc))
