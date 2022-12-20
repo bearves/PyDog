@@ -117,9 +117,13 @@ class QuadGaitController(object):
     use_se: bool = True
 
     # gait pattern generator
-    stand_gait:    GaitPatternGenerator
-    trot_gait:     GaitPatternGenerator
-    current_gait:  GaitPatternGenerator
+    stand_gait:     GaitPatternGenerator
+    fast_trot_gait: GaitPatternGenerator
+    walk_trot_gait: GaitPatternGenerator
+    gait_list: list[GaitPatternGenerator]
+
+    current_gait:   GaitPatternGenerator
+    current_gait_idx: int
 
     # robot kinematic and dynamic models
     kin_model:  RobotKineticModel
@@ -201,13 +205,16 @@ class QuadGaitController(object):
             'stand', 0.5, np.array([0, 0, 0, 0]), np.array([1, 1, 1, 1]))
 
         # flying trot
-        self.trot_gait = GaitPatternGenerator('trot',  0.3, np.array(
+        self.fast_trot_gait = GaitPatternGenerator('fast_trot',  0.3, np.array(
             [0, 0.5, 0.5, 0]), 0.35 * np.array([1, 1, 1, 1]))
         # walking trot
-        #self.trot_gait = GaitPatternGenerator('trot', 0.5, np.array(
-        #    [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
+        self.walk_trot_gait = GaitPatternGenerator('walk_trot', 0.5, np.array(
+            [0, 0.5, 0.5, 0]), np.array([0.5, 0.5, 0.5, 0.5]))
+
+        self.gait_list = [self.stand_gait, self.fast_trot_gait, self.walk_trot_gait]
             
         self.current_gait = self.stand_gait
+        self.current_gait_idx = 0
 
         # setup kinematics model
         self.kin_model = RobotKineticModel()
@@ -393,11 +400,11 @@ class QuadGaitController(object):
         # switch gait generator if cmd received
         time_now = feedbacks.time_now
         if self.gait_switch_cmd and \
-           self.current_gait.gait_name != 'trot' and \
            self.current_gait.can_switch():
 
-            print("Switch to trot at %f" % time_now)
-            self.current_gait = self.trot_gait
+            print("Switch to next gait at %f" % time_now)
+            self.current_gait_idx = (self.current_gait_idx + 1) % len(self.gait_list)
+            self.current_gait = self.gait_list[self.current_gait_idx]
             self.current_gait.set_start_time(time_now)
             self.gait_switch_cmd = False
         
@@ -428,8 +435,6 @@ class QuadGaitController(object):
                                    self.current_support_state,
                                    self.current_support_phase)
             
-            # TODO: when using state estimator's result, 
-            # the foothold planning should be adjusted for consistent body height.
             self.current_robot_state.reset(
                 self.state_estm.get_est_body_pos_wcs(), self.state_estm.get_est_body_vel_wcs(),
                 self.state_estm.get_est_body_orn_wcs(), feedbacks.body_angvel,
