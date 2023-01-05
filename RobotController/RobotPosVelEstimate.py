@@ -57,6 +57,7 @@ class QuadPosVelEstimator(object):
     Ck: np.ndarray      # rotation matrix 3x3, mapping vector from WCS to BCS (for the compliance to the ETH's paper)
     ak: np.ndarray      # absolute acceleration in WCS, i.e. ak = Ck.T (fk_measure - acc_bias) + g
     fk: np.ndarray      # net acceleration in BCS, i.e. fk = fk_measure - acc_bias
+    wk: np.ndarray      # measured angular velocity in BCS
 
     # useful constants
     g: np.ndarray = np.array([0, 0, -9.81]) # gravitational acceleration
