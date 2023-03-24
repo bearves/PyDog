@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from scipy.spatial.transform import Rotation as rot
+from RobotController import RobotCurves
 
 
 class BodyTrjPlanner(object):
@@ -231,8 +232,8 @@ class FootholdPlanner(object):
         for i in range(self.n_leg):
             # if td event, update current footholds use current leg pos at td moment
             if self.last_support_state[i] == 0 and self.current_support_state[i] == 1:
-                self.current_footholds[0+i*3:3+i *
-                                       3] = self.current_leg_pos[0+i*3:3+i*3]
+                self.current_footholds[0+i*3:3+i*3] = self.current_leg_pos[0+i*3:3+i*3]
+
             # if lft event, update liftup footpos use current leg pos at liftup moment
             if self.last_support_state[i] == 1 and self.current_support_state[i] == 0:
                 self.liftup_leg_pos[0+i*3:3+i*3] = self.current_leg_pos[0+i*3:3+i*3]
@@ -280,8 +281,7 @@ class FootholdPlanner(object):
             # secondly, predict hip position in wcs at the next touchdown moment
             hip_pos_prj = hip_pos_wrt_body[0+leg*3:3+leg*3]
             hip_pos_prj[0] -= 0.029  # x compensation due to weight balance
-            self.hip_pos_wcs_next_td[0+leg*3:3+leg *
-                                     3] = body_pos_next_td + Rz_body_next @ hip_pos_prj
+            self.hip_pos_wcs_next_td[0+leg*3:3+leg*3] = body_pos_next_td + Rz_body_next @ hip_pos_prj
 
             # thirdly, calculate body relative height and v_now x omega_des_z
             vxw = np.array([body_vel_now[1], -body_vel_now[0]]) * body_des_yawdot # v_now x omega_des_z
@@ -336,12 +336,10 @@ class FootholdPlanner(object):
 
                 if use_next_foothold_flag[leg]:
                     # use next estimated footholds
-                    future_r_leg_traj[i, 0+leg*3:3+leg *
-                                      3] = self.next_footholds[0+leg*3:3+leg*3]
+                    future_r_leg_traj[i, 0+leg*3:3+leg*3] = self.next_footholds[0+leg*3:3+leg*3]
                 else:
                     # use current leg pos
-                    future_r_leg_traj[i, 0+leg*3:3+leg *
-                                      3] = self.current_leg_pos[0+leg*3:3+leg*3]
+                    future_r_leg_traj[i, 0+leg*3:3+leg*3] = self.current_leg_pos[0+leg*3:3+leg*3]
 
         return future_r_leg_traj
 
@@ -393,14 +391,19 @@ class SwingTrjPlanner(object):
     """
     start_point: np.ndarray = np.zeros(3)  # start point of the swing trajectory
     end_point:   np.ndarray = np.zeros(3)  # end point of the swing trajectory
-    step_height: float = 0.08              # step height of the swing trajectory
+    step_height: float = 0.2              # step height of the swing trajectory
 
+    kp_builder:  RobotCurves.BezierKeyPointBuilder  # key point builder for bezier curve generator
+    bezier_crv:  RobotCurves.BezierCurve            # bezier curve generator
+    sine_crv:    RobotCurves.SineCurve              # sine curve generator
 
     def __init__(self) -> None:
         """
             Create a Swing trajectory planner
         """
-        pass
+        self.kp_builder = RobotCurves.BezierKeyPointBuilder()
+        self.bezier_crv = RobotCurves.BezierCurve()
+        self.sine_crv   = RobotCurves.SineCurve()
 
 
     def set_start_point(self, sp: np.ndarray):
@@ -440,20 +443,15 @@ class SwingTrjPlanner(object):
                 tip_vel (array(3)): tip velocity at given time ratio.
                 tip_acc (array(3)): tip acceleration at given time ratio.
         """
-
         pivot = 0.5 * (1 - math.cos(math.pi * time_ratio))
-        tip_pos = (1 - pivot) * self.start_point + (pivot) * self.end_point
-        # add height curve
-        tip_pos[2] += self.step_height * math.sin(math.pi * pivot)
-
         pivotdot = 0.5 * math.sin(math.pi * time_ratio) * math.pi * time_ratio_dot
-        tip_vel = (self.end_point - self.start_point) * pivotdot
-        tip_vel[2] += self.step_height * math.cos(math.pi * pivot) * math.pi * pivotdot
-
         pivotddot = 0.5 * (math.pi**2) * math.cos(math.pi*time_ratio) * (time_ratio_dot**2)
-        tip_acc = (self.end_point - self.start_point) * pivotddot
-        tip_acc[2] += self.step_height * math.cos(math.pi * pivot) * math.pi * pivotddot - \
-                      self.step_height * math.sin(math.pi * pivot) * (math.pi * pivotdot)**2
+
+        #self.sine_crv.set_key_points(self.start_point, self.end_point, self.step_height)
+        #tip_pos, tip_vel, tip_acc = self.sine_crv.get_pva_at(pivot, pivotdot, pivotddot)
+        key_pts = self.kp_builder.build_kp_normal(self.start_point, self.end_point, self.step_height, 1)
+        self.bezier_crv.set_key_points(key_pts)
+        tip_pos, tip_vel, tip_acc = self.bezier_crv.get_pva_at(pivot, pivotdot, pivotddot)
 
         return tip_pos, tip_vel, tip_acc
 
