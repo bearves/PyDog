@@ -40,6 +40,35 @@ class BezierKeyPointBuilder(object):
         key_pts[2, 2] += height
         key_pts[2, 3] += height * steep
         return key_pts
+    
+    def build_kp_stair(self, 
+                       start: np.ndarray, 
+                       end: np.ndarray, 
+                       height: float, 
+                       steep: float) -> np.ndarray:
+        """
+            build swing curve's key points for stair terrain condition.
+
+            Parameters:
+                start (array(3)):  start point of the swing curve in 3D Cartesian space.
+                end   (array(3)):  end point of the swing curve in 3D Cartesian space.
+                height (float)  :  nominal height of the step.
+                steep  (float)  :  a coefficient to indicate the steepness of the swing curve.
+                                   the more steep, the more the curve is like a rectangle. 
+        """
+        key_pts = np.zeros((3, 6))
+        key_pts[:, 0] = start
+        key_pts[:, 1] = -0.2 * end +  1.2 * start
+        key_pts[:, 2] =  0.3 * end +  0.7 * start
+        key_pts[:, 3] =  0.7 * end +  0.3 * start
+        key_pts[:, 4] =  1.2 * end + -0.2 * start
+        key_pts[:, 5] = end
+        
+        key_pts[2, 1] += height * steep
+        key_pts[2, 2] += height
+        key_pts[2, 3] += height
+        key_pts[2, 4] += height * steep
+        return key_pts
 
 
 class BezierCurve(object):

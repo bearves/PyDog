@@ -9,20 +9,19 @@ from RobotController import RobotCurves as rcv
 
 np.set_printoptions(precision=4, suppress=True)
 
-n_pts = 5
-
-h = 0.25
-edge_coe = 1.8
+h = 0.18
+edge_coe = 1.5
 
 start_point = np.array([0, 0, 0])
-end_point = np.array([0.4, 0, 0.2])
+end_point = np.array([0.4, 0, 0])
 
 kp_builder = rcv.BezierKeyPointBuilder()
 
-key_pts = kp_builder.build_kp_normal(start_point, end_point, h, edge_coe)
+key_pts = kp_builder.build_kp_stair(start_point, end_point, h, edge_coe)
+n_pts = key_pts.shape[1]
 
 bezier_curve = rcv.BezierCurve()
-bezier_curve.set_key_points(key_pts[:, 0:n_pts])
+bezier_curve.set_key_points(key_pts)
 print(bezier_curve.coe)
 print(bezier_curve.key_pts)
 

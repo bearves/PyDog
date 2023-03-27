@@ -49,8 +49,8 @@
 8. Leg trajectory planner (DONE)
     - Leg kinematics
         - Leg FK, IK and Jac in Leg CS
-    - Interpolation from last footholds to next footholds using sin/cos curve
-    - //TODO: Interpolation using bezier curve or spline
+    - Interpolation from last footholds to next footholds using sin/cos curve (DONE)
+    - Interpolation using bezier curve or spline （DONE）
     - Get tip ref pos, ref vel in WCS
     - Tip ref accel in WCS
 
