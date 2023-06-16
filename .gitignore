@@ -5,3 +5,6 @@ Papers
 *.pyc
 *.csv
 __pycache__
+RobotController/cpp/build
+RobotController/cpp/qpOASES
+RobotController/cpp/quadprog

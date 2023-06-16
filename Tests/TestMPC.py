@@ -1,12 +1,13 @@
 import sys,os
 sys.path.append(os.getcwd()+'/..')
 import numpy as np
+import time
 import qpsolvers
 from scipy.spatial.transform import Rotation as Rot
 
 from RobotController import RobotMPC as ctrl
 
-mpc = ctrl.QuadConvexMPC(1.0/240., 6)
+mpc = ctrl.QuadConvexMPC(0.001, 25)
 
 body_rot = Rot.from_rotvec([0,0,0.1])
 A, B = mpc.cal_state_equation(
@@ -20,8 +21,8 @@ A, B = mpc.cal_state_equation(
 C, c, n_support = mpc.cal_friction_constraint(np.array([0,0,0,1]))
 D, d, n_swing = mpc.cal_swing_force_constraints(np.array([0,1,0,1]))
 
-#print(A)
-#print(B)
+print(A)
+print(B)
 #print(C)
 #print(np.linalg.matrix_rank(C))
 #print(n_support)
@@ -34,39 +35,56 @@ r_leg_list = np.zeros((mpc.horizon_length, 12))
 support_state_list = np.zeros((mpc.horizon_length, 4))
 x_ref_list = np.zeros((mpc.horizon_length, mpc.dim_s))
 
-x0 = np.array([0,0.02,0, # R, P, Y
-               0,0,0, # x, y, z
-               0,0,0, # wx, wy, wz
-               0,0,0, # vx, vy, vz
-               -9.81]) # gravity
+start = time.time()
 
-for i in range(mpc.horizon_length):
-    body_euler_list[i, :] = np.flip(body_rot.as_euler('ZYX'))
-    r_leg_list[i, :] = np.array([0.183, -0.047, 0,
-                                 0.183,  0.047, 0,
-                                -0.183, -0.047, 0,
-                                -0.183,  0.047, 0])
-    support_state_list[i, :] = np.array([1,0,0,1])
-    x_ref_list[i, :] = np.array([0,0,0,
-                                 0,0,0,
-                                 0,0,0,
-                                 0,0,0,
-                                 -9.81])
+total_loop = 100
+for l in range(total_loop):
+    x0 = np.array([0,0.02,0, # R, P, Y
+                0,0,0, # x, y, z
+                0,0,0, # wx, wy, wz
+                0,0,0, # vx, vy, vz
+                -9.81]) # gravity
 
-mpc.cal_weight_matrices()
+    for i in range(mpc.horizon_length):
+        body_euler_list[i, :] = np.flip(body_rot.as_euler('ZYX'))
+        r_leg_list[i, :] = np.array([0.183, -0.047, 0,
+                                    0.183,  0.047, 0,
+                                    -0.183, -0.047, 0,
+                                    -0.183,  0.047, 0])
+        support_state_list[i, :] = np.array([1,0,0,1])
+        x_ref_list[i, :] = np.array([0,0,0,
+                                    0,0,0,
+                                    0,0,0,
+                                    0,0,0,
+                                    -9.81])
 
-mpc.update_mpc_matrices(body_euler_list, r_leg_list, support_state_list, x0, x_ref_list)
-mpc.update_super_matrices()
-#print(np.linalg.matrix_rank(mpc.Abar))
-#print(np.linalg.matrix_rank(mpc.Bbar))
-#print(mpc.Cbar.shape)
+    mpc.cal_weight_matrices()
 
-#print(mpc.H)
-u_mpc = mpc.solve()
-print('Result:')
-print(u_mpc[:, 0])
+    mpc.update_mpc_matrices(body_euler_list, r_leg_list, support_state_list, x0, x_ref_list)
+    mpc.update_super_matrices()
+    #print(np.linalg.matrix_rank(mpc.Abar))
+    #print(np.linalg.matrix_rank(mpc.Bbar))
+    #print(mpc.Cbar.shape)
+    #print(mpc.Dbar.shape)
 
-u_mpc_all = mpc.reduce_solve()
-print('Result:')
-print(u_mpc_all[:, 0])
-print(np.linalg.norm(u_mpc_all - u_mpc))
+    u_mpc = mpc.solve()
+
+    #print(mpc.H)
+    #print(mpc.G)
+    #print(mpc.Cbar)
+    #print(mpc.cbar)
+    #print(mpc.Dbar)
+    #print(mpc.dbar)
+    #print('Result:')
+    #print(u_mpc[:, 0])
+
+    #u_mpc_all = mpc.reduce_solve()
+
+    #print('Result:')
+    #print(u_mpc_all[:, 0])
+    #print(np.linalg.norm(u_mpc_all - u_mpc))
+
+end = time.time()
+
+print("The time of a mpc cycle is :",
+      (end-start) * 10**3 / total_loop, "ms")

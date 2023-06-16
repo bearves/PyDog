@@ -1,0 +1,22 @@
+QPSolver
+MPC: u = 12, HZ = 20, duty = 0.5
+
+Environment: CPU: i7-12700H (Power efficient mode) RAM: 16G MinGW GCC 12.2.0 on Windows 11
+
+Execution time (in ms)
+             lang    full   reduce
+qpOASES:      c++   22.71     2.61
+quadprog++:   c++   38.31     2.93 
+quadprog:      py   23.13     6.96
+osqp:          py   20.09     9.75
+qpOASES:       py    800+     100+
+
+Environment: CPU: i7-12700H (Performance mode)     RAM: 16G MinGW GCC 12.2.0 on Windows 11
+
+Execution time (in ms)
+             lang    full   reduce
+qpOASES:      c++   16.38     1.85
+quadprog++:   c++   17.66     2.14 
+quadprog:      py   16.28     4.41
+osqp:          py   14.21     6.60
+qpOASES:       py  559.70    71.54
