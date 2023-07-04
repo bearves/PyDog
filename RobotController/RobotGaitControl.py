@@ -14,6 +14,7 @@ from RobotController.RobotVMC import QuadSingleBodyVMC
 from RobotController.RobotWBIC import QuadWBIC
 from RobotController.RobotSteer import RobotSteer, DirectionFlag
 
+from RobotController.cpp.build.robotMPC_pb import QuadConvexMPCWrapper
 
 class QuadControlInput(object):
     """
@@ -144,6 +145,7 @@ class QuadGaitController(object):
     # controllers
     vmc:  QuadSingleBodyVMC
     mpc:  QuadConvexMPC
+    mpcpp: QuadConvexMPCWrapper
     wbic: QuadWBIC
 
     # Robot steer
@@ -165,6 +167,7 @@ class QuadGaitController(object):
 
     # control internal outputs
     u_mpc: np.ndarray
+    u_mpcpp: np.ndarray
     u_vmc: np.ndarray
     ref_leg_force_wcs: np.ndarray
     jnt_ref_pos_wbic:  np.ndarray
@@ -244,6 +247,9 @@ class QuadGaitController(object):
         # setup controllers
         self.mpc = QuadConvexMPC(self.dt, self.leap)
         self.mpc.cal_weight_matrices()
+        self.mpcpp = QuadConvexMPCWrapper(self.dt, self.leap)
+        self.mpcpp.cal_weight_matrices()
+
         self.vmc = QuadSingleBodyVMC(self.dt, self.leap)
         self.wbic = QuadWBIC()
 
@@ -265,6 +271,7 @@ class QuadGaitController(object):
         self.last_body_euler_ypr = np.zeros(3)
 
         self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
+        self.u_mpcpp = np.zeros((3*self.n_leg, 1))
         self.u_vmc = np.zeros(3*self.n_leg)
         self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
         self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
@@ -322,6 +329,7 @@ class QuadGaitController(object):
         self.last_body_euler_ypr = body_euler
 
         self.u_mpc = np.zeros((3*self.n_leg, self.mpc.horizon_length))
+        self.u_mpcpp = np.zeros((3*self.n_leg, 1))
         self.u_vmc = np.zeros(3*self.n_leg)
         self.ref_leg_force_wcs = np.zeros(3*self.n_leg)
         self.jnt_ref_pos_wbic = np.zeros(3*self.n_leg)
@@ -357,7 +365,9 @@ class QuadGaitController(object):
         if self.use_mpc:
             if self.mpc.need_solve(self.count - 1):
                 self.solve_mpc()
-            self.ref_leg_force_wcs = self.u_mpc[:, 0]
+            #self.ref_leg_force_wcs = self.u_mpc[:, 0]
+            self.ref_leg_force_wcs = self.u_mpcpp.ravel()
+
         else:
             if self.vmc.need_solve(self.count - 1):
                 self.solve_vmc()
@@ -534,7 +544,7 @@ class QuadGaitController(object):
                                                           support_state_future_traj)
 
         # Step 5. Solve MPC problem
-        #print('MPC solving')
+        """
         self.mpc.update_mpc_matrices(
             body_future_euler, foothold_future_traj,
             support_state_future_traj, current_state,
@@ -542,7 +552,11 @@ class QuadGaitController(object):
         self.mpc.update_super_matrices()
         #self.u_mpc = self.mpc.solve()
         self.u_mpc = self.mpc.reduce_solve()
-        #print(np.linalg.norm(self.u_mpc - self.u_mpc_2))
+        """
+        self.u_mpcpp = self.mpcpp.solve(
+            body_future_euler, foothold_future_traj, 
+            support_state_future_traj, body_ref_traj, 
+            current_state)
 
 
     def solve_vmc(self):

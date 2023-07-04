@@ -493,6 +493,7 @@ void QuadConvexMPC::reduce_solve(Eigen::Matrix<double, dim_u, 1>& u_mpc)
 
     Breduce.resize(HZ*dim_s, 3*total_support_legs);
     Rreduce.resize(3*total_support_legs, 3*total_support_legs);
+    Rreduce.setZero();
     Creduce.resize(6*total_support_legs, 3*total_support_legs);
 
     for (int i = 0; i < total_support_legs; i++)
@@ -517,6 +518,7 @@ void QuadConvexMPC::reduce_solve(Eigen::Matrix<double, dim_u, 1>& u_mpc)
     qp_solver.solve_qp(Hreduce, Greduce, empty, empty, Creduce, cbar, solution, back_solver);
     
     // map back results
+    u_mpc.setZero();
     for(int i = 0; i < dim_u && u_idx[i] < dim_u; i++)
     {
         u_mpc(u_idx[i], 0) = solution(i, 0);

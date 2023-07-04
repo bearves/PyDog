@@ -391,7 +391,7 @@ class SwingTrjPlanner(object):
     """
     start_point: np.ndarray = np.zeros(3)  # start point of the swing trajectory
     end_point:   np.ndarray = np.zeros(3)  # end point of the swing trajectory
-    step_height: float = 0.18              # step height of the swing trajectory
+    step_height: float = 0.07              # step height of the swing trajectory
 
     kp_builder:  RobotCurves.BezierKeyPointBuilder  # key point builder for bezier curve generator
     bezier_crv:  RobotCurves.BezierCurve            # bezier curve generator

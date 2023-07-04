@@ -6,5 +6,4 @@ Papers
 *.csv
 __pycache__
 RobotController/cpp/build
-RobotController/cpp/qpOASES
-RobotController/cpp/quadprog
+RobotController/cpp/third_party

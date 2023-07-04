@@ -20,3 +20,4 @@ quadprog++:   c++   17.66     2.14
 quadprog:      py   16.28     4.41
 osqp:          py   14.21     6.60
 qpOASES:       py  559.70    71.54
+qpOASES: c++/pybd             2.30
